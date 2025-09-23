@@ -6,7 +6,8 @@ library(readxl)
 ## for each Disease Area, Target Protein, and Indication + Plotting   ##
 ########################################################################
 
-all.drugs = read_xls("dataCapstone.xls")
+all.drugs = read_xls("dataCapstone.xls") %>%
+  filter(!is.na(SMILES))
 
 head(all.drugs)
 
@@ -154,7 +155,7 @@ ggplot(data.frame(
   guides(fill = "none") +
   ylab("Target Protein") +
   xlab("# of Occurrences") +
-  ggtitle("Distribution of Character Target Protein Prefixes Across Launched Neuro/Psych Drugs") +
+  ggtitle("Distribution of Target Protein Prefixes Across Neuro/Psych Drugs") +
   theme(axis.text = element_text(size = 5)) +
   theme_bw()
 
@@ -250,7 +251,7 @@ counts.indication
 # The most common indications are depression and schizophrenia
 counts.indication[which(counts.indication == max(as.numeric(counts.indication)))]
 
-counts.indication[which(counts.indication > 20)]
+counts.indication[which(counts.indication > 10)]
 
 # Kind of hard to plot since there's a lot of columns of 1s and 0, so we can try the
 # tidyverse "unnesting" route for more complex relationships

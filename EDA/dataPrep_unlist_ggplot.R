@@ -54,18 +54,17 @@ unlisted.drugs %>%
 # Generic first-letters-only clustering
 unlisted.drugs %>%
   filter(`Disease Area` == "neurology/psychiatry",
-         Indication == c("depression", "schizophrenia",
-                         "Parkinson's Disease", "pain relief")) %>%
-  ggplot(aes(y = TargetPrefix)) +
-  geom_bar(stat = "count",
-           fill = "black") +
+         Indication == c("depression", "schizophrenia")) %>%
+  ggplot(aes(y = TargetPrefix, fill = TargetPrefix)) +
+  geom_bar(stat = "count") +
   facet_wrap(vars(Indication), scales = "free_x") +
   ylab("Target Protein") +
   xlab("# of Occurences") +
   theme_bw() +
   theme(strip.background = element_rect(fill = "white", # get rid of ggplot grey face headers
                                         color = "white"),
-        strip.text = element_text(size = 14))
+        strip.text = element_text(size = 14)) +
+  guides(fill = "none")
 
 # Our defined version of clustering - didn't work
 
