@@ -85,3 +85,25 @@ unlisted.drugs %>%
 #   xlab("# of Occurences") +
 #   theme_bw()
 
+## Looking at the MOAs now for depression & schizophrenia
+## to see if the MOA can differentiate them
+
+# Generic first-letters-only clustering
+
+all.drugs %>%
+  separate_rows(MOA, sep = ",\\s*") %>%
+  separate_rows(Indication, sep = ",\\s*") %>%
+  separate_rows(`Disease Area`, sep = ",\\s*") %>%
+  filter(`Disease Area` == "neurology/psychiatry",
+         Indication == c("depression", "schizophrenia")) %>%
+  ggplot(aes(y = MOA, fill = MOA)) +
+  geom_bar(stat = "count") +
+  facet_wrap(vars(Indication), scales = "free_x") +
+  ylab("Mechanism of Action (MOA)") +
+  xlab("# of Occurences") +
+  theme_bw() +
+  theme(strip.background = element_rect(fill = "white", # get rid of ggplot grey face headers
+                                        color = "white"),
+        strip.text = element_text(size = 14)) +
+  guides(fill = "none")
+
