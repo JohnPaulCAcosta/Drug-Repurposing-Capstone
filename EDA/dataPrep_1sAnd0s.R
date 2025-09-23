@@ -6,7 +6,7 @@ library(readxl)
 ## for each Disease Area, Target Protein, and Indication + Plotting   ##
 ########################################################################
 
-all.drugs = read_xls("~/Desktop/Texas A&M University - Statistics/Fall 2025/STAT 482/dataCapstone.xls")
+all.drugs = read_xls("dataCapstone.xls")
 
 head(all.drugs)
 
