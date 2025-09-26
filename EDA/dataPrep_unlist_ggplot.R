@@ -96,8 +96,8 @@ all.drugs %>%
   separate_rows(`Disease Area`, sep = ",\\s*") %>%
   filter(`Disease Area` == "neurology/psychiatry",
          Indication == c("depression", "schizophrenia")) %>%
-  ggplot(aes(y = MOA, fill = MOA)) +
-  geom_bar(stat = "count") +
+  ggplot(aes(y = MOA)) +
+  geom_bar(stat = "count", fill = "maroon") +
   facet_wrap(vars(Indication), scales = "free_x") +
   ylab("Mechanism of Action (MOA)") +
   xlab("# of Occurences") +

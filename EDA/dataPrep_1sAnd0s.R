@@ -150,8 +150,8 @@ count.filter = 7
 ggplot(data.frame(
   Names = names(counts.pref[which(counts.pref > count.filter)]),
   Counts = as.numeric(counts.pref[which(counts.pref > count.filter)])
-), aes(x = Counts, y = Names, fill = Names)) +
-  geom_bar(stat = "identity") +
+), aes(x = Counts, y = Names)) +
+  geom_bar(stat = "identity", fill = "maroon") +
   guides(fill = "none") +
   ylab("Target Protein") +
   xlab("# of Occurrences") +
