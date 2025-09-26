@@ -13,11 +13,8 @@ all.drugs = read_xls("literallyAllDrugs.xls") %>%
     num.atoms = map_dbl(parsed.SMILES, get.atom.count),
     # bonds = map_dbl(parsed.SMILES, get.bonds), # doesn't work
     fp = map(parsed.SMILES, ~ get.fingerprint(.x, type = "extended")),
-    xlogp = map_dbl(parsed.SMILES, get.xlogp).
-    get.mol2formula()
+    xlogp = map_dbl(parsed.SMILES, get.xlogp)
   )
-
-test = rcdk::get.fingerprint(all.drugs$parsed.SMILES[[1]])
 
 summary(all.drugs[, c("mass", "num.atoms", "xlogp")])
 
@@ -46,6 +43,8 @@ all.drugs %>%
   ungroup() %>%
   ggplot(aes(y = `Disease Area`, x = xlogp)) +
   geom_boxplot() 
+
+# I mean I guess they're different for each disease area
 
 # Mass, # of Atoms, and XLogP across neuro/psych drugs
 
@@ -83,3 +82,10 @@ neuro.psych %>%
   geom_boxplot() +
   theme_bw() +
   xlab("XLogP")
+
+# Both summary tables
+
+summary(all.drugs[, c("mass", "num.atoms", "xlogp")])
+
+summary(neuro.psych[,c("mass", "num.atoms", "xlogp")])
+
