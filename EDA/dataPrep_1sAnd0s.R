@@ -261,3 +261,11 @@ counts.indication[which(counts.indication > 10)]
 dim(neuro.psych)
 colnames(neuro.psych)
 
+
+test.smiles.p = parse.smiles(str_split(neuro.psych$SMILES[[1]], ", ")[[1]][1])
+test.smiles.p
+
+test.smiles = test.smiles.p$`CN1CCc2cccc-3c2[C@H]1Cc1ccc(O)c(O)c-31`
+
+get.adjacency.matrix(test.smiles)
+
