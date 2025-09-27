@@ -7,8 +7,14 @@ library(rcdk)
 ## usage of ggplot                                                    ##
 ########################################################################
 
-all.drugs = read_xls("dataCapstone.xls") %>%
-  filter(!is.na(SMILES))
+all.drugs = read_xls("literallyAllDrugs.xls") %>%
+  filter(
+    `Disease Area` == "neurology/psychiatry", 
+    Phase == "Launched", 
+    !is.na(SMILES), 
+    !is.na(Target), 
+    !is.na(MOA)
+  )
 
 # From previous EDA in 1s & 0s / counting-based R code
 

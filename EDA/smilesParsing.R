@@ -1,10 +1,15 @@
 library(tidyverse)
 library(readxl)
 library(rcdk)
+library(rJava)
 library(fingerprint)
 
 all.drugs = read_xls("literallyAllDrugs.xls") %>%
-  filter(!is.na(SMILES)) %>%
+  filter(
+    !is.na(SMILES), 
+    !is.na(Target), 
+    !is.na(MOA)
+  ) %>%
   mutate(first.SMILES = map_chr(SMILES, ~ str_split(.x, ",\\s*")[[1]][[1]])) %>%
   mutate(parsed.SMILES = map(first.SMILES, ~ parse.smiles(.x)[[1]])) %>%
   filter(!map_lgl(parsed.SMILES, is.null)) %>%
@@ -13,7 +18,8 @@ all.drugs = read_xls("literallyAllDrugs.xls") %>%
     num.atoms = map_dbl(parsed.SMILES, get.atom.count),
     # bonds = map_dbl(parsed.SMILES, get.bonds), # doesn't work
     fp = map(parsed.SMILES, ~ get.fingerprint(.x, type = "extended")),
-    xlogp = map_dbl(parsed.SMILES, get.xlogp)
+    xlogp = map_dbl(parsed.SMILES, get.xlogp),
+    tpsa = map_dbl(parsed.SMILES, get.tpsa)
   )
 
 summary(all.drugs[, c("mass", "num.atoms", "xlogp")])

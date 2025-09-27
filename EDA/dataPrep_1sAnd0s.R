@@ -6,8 +6,12 @@ library(readxl)
 ## for each Disease Area, Target Protein, and Indication + Plotting   ##
 ########################################################################
 
-all.drugs = read_xls("dataCapstone.xls") %>%
-  filter(!is.na(SMILES))
+all.drugs = read_xls("literallyAllDrugs.xls") %>%
+  filter(
+    !is.na(SMILES), 
+    !is.na(Target), 
+    !is.na(MOA)
+  )
 
 head(all.drugs)
 
