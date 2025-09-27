@@ -55,9 +55,8 @@ ggplot(data.frame(
 
 ## Distribution of the Targets in Launched for Neurology/Psychiatry
 
-nP = launched %>% # 368 launched
-  filter(str_detect(`Disease Area`, "neurology/psychiatry"),
-         !is.na(SMILES))
+nP = launched %>% # 384 launched
+  filter(str_detect(`Disease Area`, "neurology/psychiatry"))
 
 nP$TargetVector = strsplit(nP$Target, ", ")
 

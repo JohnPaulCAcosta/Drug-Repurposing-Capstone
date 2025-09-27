@@ -55,7 +55,7 @@ all.drugs %>%
 # Mass, # of Atoms, and XLogP across neuro/psych drugs
 
 neuro.psych = all.drugs %>%
-  filter(`Disease Area` == "neurology/psychiatry", Phase == "Launched")
+  filter(str_detect(`Disease Area`, "neurology/psychiatry"), Phase == "Launched")
 
 summary(neuro.psych[,c("mass", "num.atoms", "xlogp")])
 

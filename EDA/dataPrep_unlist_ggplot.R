@@ -9,7 +9,7 @@ library(rcdk)
 
 all.drugs = read_xls("literallyAllDrugs.xls") %>%
   filter(
-    `Disease Area` == "neurology/psychiatry", 
+    str_detect(`Disease Area`, "neurology/psychiatry"), 
     Phase == "Launched", 
     !is.na(SMILES), 
     !is.na(Target), 
@@ -61,8 +61,11 @@ unlisted.drugs %>%
 unlisted.drugs %>%
   filter(`Disease Area` == "neurology/psychiatry",
          Indication == c("depression", "schizophrenia")) %>%
-  ggplot(aes(y = TargetPrefix, fill = TargetPrefix)) +
-  geom_bar(stat = "count") +
+  group_by(TargetPrefix) %>%
+  filter(n() >= 5) %>%
+  ungroup() %>%
+  ggplot(aes(y = TargetPrefix)) +
+  geom_bar(stat = "count", fill = "maroon") +
   facet_wrap(vars(Indication), scales = "free_x") +
   ylab("Target Protein") +
   xlab("# of Occurences") +
