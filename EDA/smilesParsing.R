@@ -89,9 +89,31 @@ neuro.psych %>%
   theme_bw() +
   xlab("XLogP")
 
+# all together
+
+neuro.psych %>%
+  separate_rows(Indication, sep = ",\\s*") %>%
+  group_by(Indication) %>%
+  filter(n() >= 10) %>%
+  ungroup() %>%
+  select(Indication, Mass = mass, `# of Atoms` = num.atoms, 
+         XLogP = xlogp, TPSA = tpsa) %>%
+  pivot_longer(cols = c(`# of Atoms`, XLogP, TPSA),
+               names_to = "feature",
+               values_to = "value") %>%
+  ggplot(aes(y = Indication, x = value)) +
+  geom_boxplot() +
+  facet_wrap(~ feature, 
+             scales = "free_x") +
+  theme_bw() +
+  xlab("") +
+  ylab("Indication") +
+  theme(strip.background = element_rect(fill = "white", # get rid of ggplot grey face headers
+                                        color = "white"))
+
 # Both summary tables
 
-summary(all.drugs[, c("mass", "num.atoms", "xlogp")])
+summary(all.drugs[, c("mass", "num.atoms", "xlogp", "tpsa")])
 
-summary(neuro.psych[,c("mass", "num.atoms", "xlogp")])
+summary(neuro.psych[,c("mass", "num.atoms", "xlogp", "tpsa")])
 
