@@ -1,5 +1,6 @@
 library(tidyverse)
 library(readxl)
+library(rlang)
 
 ########################################################################
 ## Code to create counts the for dataset on the number of occurrences ##
@@ -204,48 +205,78 @@ for (prefix in popular.prefixes) {
   
 }
 
-#### Create columns for the presence of every neuro/psych indication ####
+#### Create presence and count columns for each of the popular indication groups groups ####
 
-neuro.psych = all.drugs %>%
-  filter(str_detect(`Disease Area`, "neurology/psychiatry"), 
-         Phase == "Launched")
+# at this time, popular indications included are these, but
+# can be recalculated at the bottom
 
-neuro.psych$IndicationVector = strsplit(neuro.psych$Indication, ", ")
-counts.indication = list()
-counter.indication = function(vec) {
+popular.indication = c("Parkinson's Disease", "depression",
+                       "pain relief", "schizophrenia")
+
+for (ind in popular.indication) {
   
-  for (i in vec) {
-    
-    if (is.null(counts.indication[[i]])) {
-      counts.indication[[i]] <<- 0
-    }
-    
-    counts.indication[[i]] <<- counts.indication[[i]] + 1
-    
-  }
-  
-}
-for (vecT in neuro.psych$IndicationVector) {
-  counter.indication(vecT)
-}
-
-unique.ind = sort(names(counts.indication)) # 187 unique indications!
-
-for (ind in unique.ind) {
-  
-  neuro.psych = neuro.psych %>%
+  all.drugs = all.drugs %>%
     rowwise() %>%
-    mutate(!!ind := if_else(
-      any(str_starts(
-        str_split(Indication, ", ")[[1]],
-        as.character(ind)
-      )),
-      1,
-      0
-    )) %>%
+    mutate(!!paste0(ind) := sum(str_starts(
+      str_split(Indication, ", ")[[1]],
+      as.character(ind)
+    ))
+    ) %>%
     ungroup()
   
 }
+
+sum(all.drugs$`Parkinson's Disease`)
+
+all.drugs$`Parkinson's Disease` = if_else(
+  is.na(all.drugs$`Parkinson's Disease`),
+  0,
+  all.drugs$`Parkinson's Disease`
+)
+
+all.drugs$`depression` = if_else(
+  is.na(all.drugs$`depression`),
+  0,
+  all.drugs$`depression`
+)
+
+all.drugs$`pain relief` = if_else(
+  is.na(all.drugs$`pain relief`),
+  0,
+  all.drugs$`pain relief`
+)
+
+all.drugs$`schizophrenia` = if_else(
+  is.na(all.drugs$`schizophrenia`),
+  0,
+  all.drugs$`schizophrenia`
+)
+
+sum(all.drugs$schizophrenia) # should NOT be the same
+sum(!is.na(all.drugs$Indication)) # should be the same
+
+#### Create presence and count columns for each of the MOAs groups ####
+
+# at this time, popular indications included are these, but
+# can be recalculated at the bottom
+
+np.moas = unique((neuro.psych %>%
+                    separate_rows(MOA, sep = ",\\s*") %>%
+                    select(MOA))$MOA)
+
+for (moa in np.moas) {
+  
+  all.drugs = all.drugs %>%
+    rowwise() %>%
+    mutate(!!paste0(moa) := sum(str_starts(
+      str_split(MOA, ", ")[[1]],
+      as.character(moa)
+    ))
+    ) %>%
+    ungroup()
+  
+}
+
 
 #### Analyze distribution of target proteins across various neuro/psych indications ####
 
@@ -254,7 +285,7 @@ counts.indication
 # The most common indications are depression and schizophrenia
 counts.indication[which(counts.indication == max(as.numeric(counts.indication)))]
 
-counts.indication[which(counts.indication > 10)]
+popular.indication = counts.indication[which(counts.indication > 20)]
 
 # Kind of hard to plot since there's a lot of columns of 1s and 0, so we can try the
 # tidyverse "unnesting" route for more complex relationships
@@ -271,4 +302,8 @@ test.smiles.p
 test.smiles = test.smiles.p$`CN1CCc2cccc-3c2[C@H]1Cc1ccc(O)c(O)c-31`
 
 get.adjacency.matrix(test.smiles)
+
+# Save 1s and 0s all.drugs
+
+write.csv(all.drugs, file = "allDrugs1s0s.csv")
 
