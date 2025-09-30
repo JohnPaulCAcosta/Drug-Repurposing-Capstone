@@ -98,7 +98,7 @@ ggplot(data.frame(
 # Counts by the prefixes of the Target Proteins for all launched
 # neurological/psychiatric drugs
 
-nP = launched %>% # 368 launched
+nP = launched %>% 
   filter(str_detect(`Disease Area`, "neurology/psychiatry"),
          !is.na(SMILES))
 
@@ -260,7 +260,7 @@ sum(!is.na(all.drugs$Indication)) # should be the same
 # at this time, popular indications included are these, but
 # can be recalculated at the bottom
 
-np.moas = unique((neuro.psych %>%
+np.moas = unique((nP %>%
                     separate_rows(MOA, sep = ",\\s*") %>%
                     select(MOA))$MOA)
 
