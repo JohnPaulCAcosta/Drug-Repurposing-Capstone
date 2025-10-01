@@ -31,3 +31,5 @@ if (length(hit)) Sys.setenv(PATH = paste(hit[1], Sys.getenv("PATH"), sep=";"))
 
 system("git --version")
 Sys.which("git")
+
+usethis::use_git()  # will make first commit; accept RStudio restart if asked
