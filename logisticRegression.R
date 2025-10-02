@@ -16,10 +16,12 @@ model.example = glm(
   data = neuro.psych,
   family = "binomial",
   formula = depression ~ 
-    SLC + CHR + ADR +
+    SLC + HTR + CHR + ADR +
     `serotonin reuptake inhibitor` +
     `norepinephrine reuptake inhibitor` +
     `monoamine oxidase inhibitor` +
+    `T-type calcium channel blocker` +
+    `serotonin receptor antagonist` +
     xlogp + tpsa + num.atoms
 )
 
