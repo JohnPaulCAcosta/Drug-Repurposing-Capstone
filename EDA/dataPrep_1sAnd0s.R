@@ -289,32 +289,3 @@ for (moa in np.moas) {
   
 }
 
-
-#### Analyze distribution of target proteins across various neuro/psych indications ####
-
-counts.indication
-
-# The most common indications are depression and schizophrenia
-counts.indication[which(counts.indication == max(as.numeric(counts.indication)))]
-
-popular.indication = counts.indication[which(counts.indication > 20)]
-
-# Kind of hard to plot since there's a lot of columns of 1s and 0, so we can try the
-# tidyverse "unnesting" route for more complex relationships
-
-# But this route certainly made basic counting easy! Maybe for model fitting too?
-
-dim(neuro.psych)
-colnames(neuro.psych)
-
-
-test.smiles.p = parse.smiles(str_split(neuro.psych$SMILES[[1]], ", ")[[1]][1])
-test.smiles.p
-
-test.smiles = test.smiles.p$`CN1CCc2cccc-3c2[C@H]1Cc1ccc(O)c(O)c-31`
-
-get.adjacency.matrix(test.smiles)
-
-# Save 1s and 0s all.drugs
-save(all.drugs, file = "allDrugs.rds")
-
