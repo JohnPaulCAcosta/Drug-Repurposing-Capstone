@@ -8,7 +8,11 @@ neuro.psych = all.drugs %>%
   filter(str_detect(`Disease Area`, "neurology/psychiatry"),
          Phase == "Launched")
 
-logistic.model = glm(
+#### Train/test splitting
+
+#### Model fitting (example for now)
+
+model.example = glm(
   data = neuro.psych,
   family = "binomial",
   formula = depression ~ 
@@ -16,7 +20,14 @@ logistic.model = glm(
     `serotonin reuptake inhibitor` +
     `norepinephrine reuptake inhibitor` +
     `monoamine oxidase inhibitor` +
-    xlogp + tpsa
+    xlogp + tpsa + num.atoms
 )
 
-summary(logistic.model)
+#### Look at model output & summaries
+
+summary(model.example)
+
+# Compare the AICs of the different model/parameter combos we try
+model.example$aic
+
+
