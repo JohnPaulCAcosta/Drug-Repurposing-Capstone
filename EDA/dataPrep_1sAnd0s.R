@@ -316,5 +316,5 @@ test.smiles = test.smiles.p$`CN1CCc2cccc-3c2[C@H]1Cc1ccc(O)c(O)c-31`
 get.adjacency.matrix(test.smiles)
 
 # Save 1s and 0s all.drugs
-saveRDS(all.drugs, file = "allDrugs.rds")
+save(all.drugs, file = "allDrugs.rds")
 
