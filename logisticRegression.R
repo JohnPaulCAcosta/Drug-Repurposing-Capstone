@@ -2,15 +2,21 @@ library(tidyverse)
 
 ?glm
 
-new = read.csv("allDrugs1s0s.csv")
+# Run dataPrep_1sAnd0s.R for all.drugs 
 
-parkinsons = all.drugs %>%
-  filter(`Parkinson's Disease` == 1,
-         !is.na(SMILES),
-         !is.na(MOA))
+neuro.psych = all.drugs %>%
+  filter(str_detect(`Disease Area`, "neurology/psychiatry"),
+         Phase == "Launched")
 
 logistic.model = glm(
-  data = parkinsons,
+  data = neuro.psych,
   family = "binomial",
-  formula = `Parkinson's Disease` ~ SLC
+  formula = depression ~ 
+    SLC + CHR + ADR +
+    `serotonin reuptake inhibitor` +
+    `norepinephrine reuptake inhibitor` +
+    `monoamine oxidase inhibitor` +
+    xlogp + tpsa
 )
+
+summary(logistic.model)

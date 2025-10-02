@@ -1,6 +1,7 @@
 library(tidyverse)
 library(readxl)
 library(rlang)
+library(rcdk)
 
 ########################################################################
 ## Code to create counts the for dataset on the number of occurrences ##
@@ -12,6 +13,17 @@ all.drugs = read_xls("literallyAllDrugs.xls") %>%
     !is.na(SMILES), 
     !is.na(Target), 
     !is.na(MOA)
+  ) %>%
+  mutate(first.SMILES = map_chr(SMILES, ~ str_split(.x, ",\\s*")[[1]][[1]])) %>%
+  mutate(parsed.SMILES = map(first.SMILES, ~ parse.smiles(.x)[[1]])) %>%
+  filter(!map_lgl(parsed.SMILES, is.null)) %>%
+  mutate(
+    mass = map_dbl(parsed.SMILES, get.exact.mass),
+    num.atoms = map_dbl(parsed.SMILES, get.atom.count),
+    # bonds = map_dbl(parsed.SMILES, get.bonds), # doesn't work
+    fp = map(parsed.SMILES, ~ get.fingerprint(.x, type = "extended")),
+    xlogp = map_dbl(parsed.SMILES, get.xlogp),
+    tpsa = map_dbl(parsed.SMILES, get.tpsa)
   )
 
 head(all.drugs)
@@ -304,6 +316,5 @@ test.smiles = test.smiles.p$`CN1CCc2cccc-3c2[C@H]1Cc1ccc(O)c(O)c-31`
 get.adjacency.matrix(test.smiles)
 
 # Save 1s and 0s all.drugs
-
-write.csv(all.drugs, file = "allDrugs1s0s.csv")
+saveRDS(all.drugs, file = "allDrugs.rds")
 
