@@ -81,6 +81,9 @@ model.example = randomForest(
 summary(model.example)
 model.example$importance
 
+# this matrix has the true value (rows) by predicted values of the model (columns)
+model.example$confusion
+
 test.object = model.example$test
 votes = test.object$votes
 
