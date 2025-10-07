@@ -37,14 +37,15 @@ which(testing.drugs$depression == 1)
 
 predictors = c(
   "SLC",
-  "HTR",
-  "CHR",
-  "ADR",
-  "serotonin.reuptake.inhibitor",
-  "norepinephrine.reuptake.inhibitor",
-  "monoamine.oxidase.inhibitor",
-  "T.type.calcium.channel.blocker",
-  "serotonin.receptor.antagonist",
+  # "HTR",
+  # "HRH",
+  # "CHR",
+  # "ADR",
+  # "serotonin.reuptake.inhibitor",
+  # "norepinephrine.reuptake.inhibitor",
+  # "monoamine.oxidase.inhibitor",
+  # "T.type.calcium.channel.blocker",
+  # "serotonin.receptor.antagonist",
   "xlogp",
   "tpsa",
   "num.atoms"
