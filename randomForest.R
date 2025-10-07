@@ -1,5 +1,6 @@
 library(tidyverse)
 library(randomForest)
+library(caret)
 
 ?randomForest
 
@@ -28,8 +29,8 @@ testing.drugs = neuro.psych[test.index,]
 
 # See if there's a good spread of depression drugs
 
-which(training.drugs$depression == 1)
-which(testing.drugs$depression == 1)
+length(which(training.drugs$depression == 1))
+length(which(testing.drugs$depression == 1))
 
 # There is a good amount of depression indication drugs in each group!
 
@@ -37,15 +38,15 @@ which(testing.drugs$depression == 1)
 
 predictors = c(
   "SLC",
-  # "HTR",
-  # "HRH",
-  # "CHR",
-  # "ADR",
-  # "serotonin.reuptake.inhibitor",
-  # "norepinephrine.reuptake.inhibitor",
-  # "monoamine.oxidase.inhibitor",
-  # "T.type.calcium.channel.blocker",
-  # "serotonin.receptor.antagonist",
+  "HTR",
+  "HRH",
+  "CHR",
+  "ADR",
+  "serotonin.reuptake.inhibitor",
+  "norepinephrine.reuptake.inhibitor",
+  "monoamine.oxidase.inhibitor",
+  "T.type.calcium.channel.blocker",
+  "serotonin.receptor.antagonist",
   "xlogp",
   "tpsa",
   "num.atoms"
@@ -66,13 +67,14 @@ model.example = randomForest(
 summary(model.example)
 model.example$importance
 
-# this matrix has the true value (rows) by predicted values of the model (columns)
-model.example$confusion
-# I think it would make sense if we could predict the drugs actually used for
-# depression with a low error...
-
 test.object = model.example$test
 votes = test.object$votes
+
+# For reference:
+# Sensitivity = how good the model predicts the actually positive cases
+# Specificity = how good the model predicts the actually negative cases
+
+confusionMatrix(model.example$predicted, model.example$y, positive = "1")
 
 threshold = 0.4 # this can help us determine what probability we would say is
 # "good enoough" to say a drug is able to be used for depression, somehow I think
