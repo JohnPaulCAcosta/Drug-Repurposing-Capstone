@@ -50,22 +50,6 @@ predictors = c(
   "num.atoms"
 )
 
-# model.example = randomForest(
-#   formula = as.factor(depression) ~ 
-#     SLC + HTR + CHR + ADR +
-#     serotonin.reuptake.inhibitor +
-#     norepinephrine.reuptake.inhibitor +
-#     monoamine.oxidase.inhibitor +
-#     T.type.calcium.channel.blocker +
-#     serotonin.receptor.antagonist +
-#     xlogp + tpsa + num.atoms,
-#   data = training.drugs,
-#   importance = TRUE,
-#   proximity = TRUE
-#   # xtest = testing.drugs,
-#   # ytest = as.factor(testing.drugs$depression),
-# )
-
 model.example = randomForest(
   x = training.drugs[, predictors],
   y = as.factor(training.drugs$depression),
