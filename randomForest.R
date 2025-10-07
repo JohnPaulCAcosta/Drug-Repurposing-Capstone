@@ -83,12 +83,14 @@ model.example$importance
 
 # this matrix has the true value (rows) by predicted values of the model (columns)
 model.example$confusion
+# I think it would make sense if we could predict the drugs actually used for
+# depression with a low error...
 
 test.object = model.example$test
 votes = test.object$votes
 
 threshold = 0.4 # this can help us determine what probability we would say is
-# "good enoough" to say a drug is able to be used for depression
+# "good enoough" to say a drug is able to be used for depression, somehow I think
 
 which(votes[,2] > threshold)
 
