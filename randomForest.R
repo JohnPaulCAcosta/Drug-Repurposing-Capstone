@@ -38,15 +38,15 @@ length(which(testing.drugs$depression == 1))
 
 predictors = c(
   "SLC",
-  "HTR",
-  "HRH",
-  "CHR",
-  "ADR",
-  "serotonin.reuptake.inhibitor",
+  # "HTR",
+  # "HRH",
+  # "CHR",
+  # "ADR",
+  # "serotonin.reuptake.inhibitor",
   "norepinephrine.reuptake.inhibitor",
   "monoamine.oxidase.inhibitor",
-  "T.type.calcium.channel.blocker",
-  "serotonin.receptor.antagonist",
+  # "T.type.calcium.channel.blocker",
+  # "serotonin.receptor.antagonist",
   "xlogp",
   "tpsa",
   "num.atoms"
@@ -67,14 +67,14 @@ model.example = randomForest(
 summary(model.example)
 model.example$importance
 
-test.object = model.example$test
-votes = test.object$votes
-
 # For reference:
 # Sensitivity = how good the model predicts the actually positive cases
 # Specificity = how good the model predicts the actually negative cases
 
 confusionMatrix(model.example$predicted, model.example$y, positive = "1")
+
+test.object = model.example$test
+votes = test.object$votes
 
 threshold = 0.4 # this can help us determine what probability we would say is
 # "good enoough" to say a drug is able to be used for depression, somehow I think
