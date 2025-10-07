@@ -200,14 +200,14 @@ for (prefix in popular.prefixes) {
   
   all.drugs = all.drugs %>%
     rowwise() %>%
-    mutate(!!prefix := if_else(
+    mutate(!!prefix := as.factor(if_else(
       any(str_starts(
         str_split(Target, ", ")[[1]],
         as.character(prefix)
       )),
       1,
       0
-    )) %>%
+    ))) %>%
     mutate(!!paste0(prefix, ".count") := sum(str_starts(
       str_split(Target, ", ")[[1]],
       as.character(prefix)
@@ -229,43 +229,43 @@ for (ind in popular.indication) {
   
   all.drugs = all.drugs %>%
     rowwise() %>%
-    mutate(!!paste0(ind) := sum(str_starts(
+    mutate(!!paste0(ind) := as.factor(sum(str_starts(
       str_split(Indication, ", ")[[1]],
       as.character(ind)
-    ))
+    )))
     ) %>%
     ungroup()
   
 }
 
-sum(all.drugs$`Parkinson's Disease`)
+# sum(all.drugs$`Parkinson's Disease`)
 
 all.drugs$`Parkinson's Disease` = if_else(
   is.na(all.drugs$`Parkinson's Disease`),
-  0,
+  as.factor(0),
   all.drugs$`Parkinson's Disease`
 )
 
 all.drugs$`depression` = if_else(
   is.na(all.drugs$`depression`),
-  0,
+  as.factor(0),
   all.drugs$`depression`
 )
 
 all.drugs$`pain relief` = if_else(
   is.na(all.drugs$`pain relief`),
-  0,
+  as.factor(0),
   all.drugs$`pain relief`
 )
 
 all.drugs$`schizophrenia` = if_else(
   is.na(all.drugs$`schizophrenia`),
-  0,
+  as.factor(0),
   all.drugs$`schizophrenia`
 )
 
-sum(all.drugs$schizophrenia) # should NOT be the same
-sum(!is.na(all.drugs$Indication)) # should be the same
+# sum(all.drugs$schizophrenia) # should NOT be the same
+# sum(!is.na(all.drugs$Indication)) # should be the same
 
 #### Create presence and count columns for each of the MOAs groups ####
 
@@ -280,11 +280,10 @@ for (moa in np.moas) {
   
   all.drugs = all.drugs %>%
     rowwise() %>%
-    mutate(!!paste0(moa) := sum(str_starts(
+    mutate(!!paste0(moa) := as.factor(sum(str_starts(
       str_split(MOA, ", ")[[1]],
       as.character(moa)
-    ))
-    ) %>%
+    )))) %>%
     ungroup()
   
 }

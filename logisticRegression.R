@@ -25,11 +25,25 @@ model.example = glm(
     xlogp + tpsa + num.atoms
 )
 
+model.example.2 = glm(
+  data = neuro.psych,
+  family = "binomial",
+  formula = depression ~ 
+    SLC + HTR + CHR + ADR +
+    `norepinephrine reuptake inhibitor` +
+    `monoamine oxidase inhibitor` +
+    xlogp + tpsa
+)
+
 #### Look at model output & summaries
 
 summary(model.example)
+summary(model.example.2)
+
+# summary(all)
 
 # Compare the AICs of the different model/parameter combos we try
 model.example$aic
+model.example.2$aic
 
 
