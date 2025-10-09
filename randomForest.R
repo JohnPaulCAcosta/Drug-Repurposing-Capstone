@@ -111,9 +111,9 @@ confusionMatrix(model.depression$predicted, model.depression$y, positive = "1")
 ## Parkinson's Disease
 
 predictors.parkinsons = c(
-  "HTR",
-  "DRD",
-  "ADR",
+  # "HTR",
+  # "DRD",
+  # "ADR",
   "dopamine.receptor.agonist",
   "xlogp",
   "tpsa",
@@ -139,10 +139,10 @@ confusionMatrix(model.parkinsons$predicted, model.parkinsons$y, positive = "1")
 ## Schizophrenia
 
 predictors.schizophrenia = c(
-  "HTR",
-  "DRD",
-  "ADR",
-  "dopamine.receptor.antagonist",
+  # "HTR",
+  # "DRD",
+  # "ADR",
+  # "dopamine.receptor.antagonist",
   "xlogp",
   "tpsa",
   "num.atoms"
