@@ -27,10 +27,16 @@ test.index = random.numbers[(floor(n*.80)+1):n]
 training.drugs = neuro.psych[train.index,]
 testing.drugs = neuro.psych[test.index,]
 
-# See if there's a good spread of depression drugs
+# See if there's a good spread of drugs for each indication
 
 length(which(training.drugs$depression == 1))
 length(which(testing.drugs$depression == 1))
+
+length(which(training.drugs$Parkinson.s.Disease == 1))
+length(which(testing.drugs$Parkinson.s.Disease == 1))
+
+length(which(training.drugs$schizophrenia == 1))
+length(which(testing.drugs$schizophrenia == 1))
 
 # There is a good amount of depression indication drugs in each group!
 
