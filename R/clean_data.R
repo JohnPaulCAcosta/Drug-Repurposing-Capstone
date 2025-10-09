@@ -3,8 +3,11 @@ library(tidyverse)
 library(rcdk)
 library(rJava)
 library(fingerprint)
-all_drugs <- read.csv(here("drug_data", "literallyAllDrugs.csv"),
-                      check.names = FALSE)
+source(here("R", "feature_engineering.R"))
+# all_drugs <- read.csv(here("drug_data", "literallyAllDrugs.csv"),
+#                       check.names = FALSE)
+
+all_drugs<-new_dat
 
 all_drugs <- all_drugs %>%
   mutate(
