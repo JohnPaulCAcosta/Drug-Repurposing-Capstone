@@ -34,9 +34,15 @@ length(which(testing.drugs$depression == 1))
 
 # There is a good amount of depression indication drugs in each group!
 
-#### Model fitting (example for now)
+#### Model fitting
 
-predictors = c(
+# For reference:
+# Sensitivity = how good the model predicts the actually positive cases
+# Specificity = how good the model predicts the actually negative cases
+
+# Depression
+
+predictors.depression = c(
   "SLC",
   # "HTR",
   # "HRH",
@@ -52,28 +58,115 @@ predictors = c(
   "num.atoms"
 )
 
-model.example = randomForest(
-  x = training.drugs[, predictors],
+model.depression = randomForest(
+  x = training.drugs[, predictors.depression],
   y = as.factor(training.drugs$depression),
   data = training.drugs,
   importance = TRUE,
   proximity = TRUE,
-  xtest = testing.drugs[, predictors],
+  xtest = testing.drugs[, predictors.depression],
   ytest = as.factor(testing.drugs$depression)
 )
 
-#### Look at model output & summaries
+# Peek at model output & summaries to see how good it is
 
-summary(model.example)
-model.example$importance
+model.depression$importance
 
-# For reference:
-# Sensitivity = how good the model predicts the actually positive cases
-# Specificity = how good the model predicts the actually negative cases
+confusionMatrix(model.depression$predicted, model.depression$y, positive = "1")
 
-confusionMatrix(model.example$predicted, model.example$y, positive = "1")
+## Depression
 
-test.object = model.example$test
+predictors.depression = c(
+  "SLC",
+  # "HTR",
+  # "HRH",
+  # "CHR",
+  # "ADR",
+  # "serotonin.reuptake.inhibitor",
+  "norepinephrine.reuptake.inhibitor",
+  "monoamine.oxidase.inhibitor",
+  # "T.type.calcium.channel.blocker",
+  # "serotonin.receptor.antagonist",
+  "xlogp",
+  "tpsa",
+  "num.atoms"
+)
+
+model.depression = randomForest(
+  x = training.drugs[, predictors.depression],
+  y = as.factor(training.drugs$depression),
+  data = training.drugs,
+  importance = TRUE,
+  proximity = TRUE,
+  xtest = testing.drugs[, predictors.depression],
+  ytest = as.factor(testing.drugs$depression)
+)
+
+# Peek at model output & summaries to see how good it is
+
+model.depression$importance
+
+confusionMatrix(model.depression$predicted, model.depression$y, positive = "1")
+
+## Parkinson's Disease
+
+predictors.parkinsons = c(
+  "HTR",
+  "DRD",
+  "ADR",
+  "dopamine.receptor.agonist",
+  "xlogp",
+  "tpsa",
+  "num.atoms"
+)
+
+model.parkinsons = randomForest(
+  x = training.drugs[, predictors.parkinsons],
+  y = as.factor(training.drugs$Parkinson.s.Disease),
+  data = training.drugs,
+  importance = TRUE,
+  proximity = TRUE,
+  xtest = testing.drugs[, predictors.parkinsons],
+  ytest = as.factor(testing.drugs$Parkinson.s.Disease)
+)
+
+# Peek at model output & summaries to see how good it is
+
+model.parkinsons$importance
+
+confusionMatrix(model.parkinsons$predicted, model.parkinsons$y, positive = "1")
+
+## Schizophrenia
+
+predictors.schizophrenia = c(
+  "HTR",
+  "DRD",
+  "ADR",
+  "dopamine.receptor.antagonist",
+  "xlogp",
+  "tpsa",
+  "num.atoms"
+)
+
+model.schizophrenia = randomForest(
+  x = training.drugs[, predictors.schizophrenia],
+  y = as.factor(training.drugs$depression),
+  data = training.drugs,
+  importance = TRUE,
+  proximity = TRUE,
+  xtest = testing.drugs[, predictors.schizophrenia],
+  ytest = as.factor(testing.drugs$depression)
+)
+
+# Peek at model output & summaries to see how good it is
+
+model.schizophrenia$importance
+
+confusionMatrix(model.schizophrenia$predicted, model.schizophrenia$y, positive = "1")
+
+#### What are the results of our models?
+
+test.object = model.depression$test
 votes = test.object$votes
 
 threshold = 0.4 # this can help us determine what probability we would say is
