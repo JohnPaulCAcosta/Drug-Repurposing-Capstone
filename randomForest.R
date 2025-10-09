@@ -40,40 +40,6 @@ length(which(testing.drugs$depression == 1))
 # Sensitivity = how good the model predicts the actually positive cases
 # Specificity = how good the model predicts the actually negative cases
 
-# Depression
-
-predictors.depression = c(
-  "SLC",
-  # "HTR",
-  # "HRH",
-  # "CHR",
-  # "ADR",
-  # "serotonin.reuptake.inhibitor",
-  "norepinephrine.reuptake.inhibitor",
-  "monoamine.oxidase.inhibitor",
-  # "T.type.calcium.channel.blocker",
-  # "serotonin.receptor.antagonist",
-  "xlogp",
-  "tpsa",
-  "num.atoms"
-)
-
-model.depression = randomForest(
-  x = training.drugs[, predictors.depression],
-  y = as.factor(training.drugs$depression),
-  data = training.drugs,
-  importance = TRUE,
-  proximity = TRUE,
-  xtest = testing.drugs[, predictors.depression],
-  ytest = as.factor(testing.drugs$depression)
-)
-
-# Peek at model output & summaries to see how good it is
-
-model.depression$importance
-
-confusionMatrix(model.depression$predicted, model.depression$y, positive = "1")
-
 ## Depression
 
 predictors.depression = c(
