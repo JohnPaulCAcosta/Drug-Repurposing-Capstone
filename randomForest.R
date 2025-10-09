@@ -78,14 +78,15 @@ model.depression = randomForest(
 
 model.depression$importance
 
+# Make this but for the testing data
 confusionMatrix(model.depression$predicted, model.depression$y, positive = "1")
 
 ## Parkinson's Disease
 
 predictors.parkinsons = c(
-  # "HTR",
-  # "DRD",
-  # "ADR",
+  "HTR",
+  "DRD",
+  "ADR",
   "dopamine.receptor.agonist",
   "xlogp",
   "tpsa",
@@ -106,6 +107,7 @@ model.parkinsons = randomForest(
 
 model.parkinsons$importance
 
+# Make this but for the testing data
 confusionMatrix(model.parkinsons$predicted, model.parkinsons$y, positive = "1")
 
 ## Schizophrenia
@@ -134,6 +136,7 @@ model.schizophrenia = randomForest(
 
 model.schizophrenia$importance
 
+# Make this but for the testing data
 confusionMatrix(model.schizophrenia$predicted, model.schizophrenia$y, positive = "1")
 
 #### What are the results of our models?

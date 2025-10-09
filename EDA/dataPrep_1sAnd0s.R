@@ -288,3 +288,8 @@ for (moa in np.moas) {
   
 }
 
+
+# all.drugs %>%
+#   select(-first.SMILES, -parsed.SMILES) %>%
+#   write.csv(file = "allDrugs1s0s.csv")
+
