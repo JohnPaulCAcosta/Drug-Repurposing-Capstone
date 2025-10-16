@@ -1,7 +1,7 @@
 library(tidyverse)
 library(readxl)
 library(rlang)
-
+library(here)
 ########################################################################
 ## Code to create counts the for dataset on the number of occurrences ##
 ## for each Disease Area, Target Protein, and Indication + Plotting   ##
@@ -298,12 +298,21 @@ sum(!is.na(all.drugs$Indication)) # should be the same
 
 #### Create presence and count columns for each of the MOAs groups ####
 
-# at this time, popular indications included are these, but
-# can be recalculated at the bottom
 
-np.moas = unique((neuro_launched %>%
-                    separate_rows(MOA, sep = ",\\s*") %>%
-                    select(MOA))$MOA)
+np.moas <- all.drugs %>%
+  filter(
+    Phase == "Launched",
+    str_detect(coalesce(`Disease Area`, ""), fixed("neurology/psychiatry", TRUE)),
+    !is.na(SMILES) & SMILES != "",
+    !is.na(Target) & Target != "",
+    !is.na(MOA)    & MOA    != ""
+  ) %>%
+  tidyr::separate_rows(MOA, sep = ",\\s*") %>%
+  dplyr::mutate(MOA = trimws(MOA)) %>%
+  dplyr::filter(!is.na(MOA), MOA != "") %>%
+  dplyr::distinct(MOA) %>%
+  dplyr::pull(MOA)
+
 
 for (moa in np.moas) {
   
@@ -331,26 +340,76 @@ popular.indication = counts.indication[which(counts.indication > 20)]
 # Kind of hard to plot since there's a lot of columns of 1s and 0, so we can try the
 # tidyverse "unnesting" route for more complex relationships
 
-# But this route certainly made basic counting easy! Maybe for model fitting too?
-
-dim(neuro.psych)
-colnames(neuro.psych)
 
 
-test.smiles.p = parse.smiles(str_split(neuro_launched$SMILES[[1]], ", ")[[1]][1])
-test.smiles.p
 
-test.smiles = test.smiles.p$`CN1CCc2cccc-3c2[C@H]1Cc1ccc(O)c(O)c-31`
 
-get.adjacency.matrix(test.smiles)
+
 
 # Save 1s and 0s all.drugs
 
-new_dat<-write.csv(all.drugs, file = "allDrugs1s0s.csv")
-view(all.drugs)
+new_dat<-all.drugs
 
 
-moa_counts_neuro <- neuro_launched %>% dplyr::count(MOA, sort = TRUE)
-moa_top_neuro <- moa_counts_neuro %>% dplyr::slice_head(n = 40) %>% pull(MOA)
-moa_top_neuro 
-moa_counts_neuro
+# at this time, popular indications included are these, but
+# can be recalculated at the bottom
+
+# np.moas = unique((neuro_launched %>%
+#                     separate_rows(MOA, sep = ",\\s*") %>%
+#                     select(MOA))$MOA)
+# 
+# for (moa in np.moas) {
+#   
+#   all.drugs = all.drugs %>%
+#     rowwise() %>%
+#     mutate(!!paste0(moa) := sum(str_starts(
+#       str_split(MOA, ", ")[[1]],
+#       as.character(moa)
+#     ))
+#     ) %>%
+#     ungroup()
+#   
+# }
+# 
+# 
+# #### Analyze distribution of target proteins across various neuro/psych indications ####
+# 
+# counts.indication
+# 
+# # The most common indications are depression and schizophrenia
+# counts.indication[which(counts.indication == max(as.numeric(counts.indication)))]
+# 
+# popular.indication = counts.indication[which(counts.indication > 20)]
+# 
+# # Kind of hard to plot since there's a lot of columns of 1s and 0, so we can try the
+# # tidyverse "unnesting" route for more complex relationships
+# 
+# # But this route certainly made basic counting easy! Maybe for model fitting too?
+# 
+# dim(neuro_launched)
+# colnames(neuro_launched)
+# 
+# 
+# test.smiles.p = parse.smiles(str_split(neuro_launched$SMILES[[1]], ", ")[[1]][1])
+# test.smiles.p
+# 
+# test.smiles = test.smiles.p$`CN1CCc2cccc-3c2[C@H]1Cc1ccc(O)c(O)c-31`
+# 
+# get.adjacency.matrix(test.smiles)
+# 
+# # Save 1s and 0s all.drugs
+# 
+# new_dat<-all.drugs
+# view(all.drugs)
+# view(neuro_launched)
+# view(new_dat)
+# moa_counts_neuro <- neuro_launched %>% dplyr::count(MOA, sort = TRUE)
+# moa_top_neuro <- moa_counts_neuro %>% dplyr::slice_head(n = 20) %>% pull(MOA)
+# moa_top_neuro 
+# moa_counts_neuro
+# 
+# target_counts_neuro <- neuro_launched %>% dplyr::count(Target, sort = TRUE)
+# target_top_neuro <- target_counts_neuro %>% dplyr::slice_head(n = 20) %>% pull(Target)
+# target_top_neuro 
+# target_counts_neuro
+# view(all.drugs)

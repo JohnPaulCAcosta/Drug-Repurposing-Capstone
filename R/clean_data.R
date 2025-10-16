@@ -38,6 +38,9 @@ nrow(non_launched_with_smiles)
 neuro_launched <- neuro_launched %>% filter(!is.na(SMILES) & SMILES != "" & !is.na(Target) & Target != "" & !is.na(MOA) & MOA != "")
 nrow(neuro_launched)
 
+
+
+
 neuro_launched <- neuro_launched %>%
   filter(
     !is.na(SMILES), 
@@ -122,4 +125,16 @@ neuro_launched %>%
   xlab("XLogP")
 
 # Both summary tables
+test.smiles.p = parse.smiles(str_split(neuro_launched$SMILES[[1]], ", ")[[1]][1])
+test.smiles.p
+
+moa_counts_neuro <- neuro_launched %>% dplyr::count(MOA, sort = TRUE)
+moa_top_neuro <- moa_counts_neuro %>% dplyr::slice_head(n = 20) %>% pull(MOA)
+moa_top_neuro 
+moa_counts_neuro
+
+target_counts_neuro <- neuro_launched %>% dplyr::count(Target, sort = TRUE)
+target_top_neuro <- target_counts_neuro %>% dplyr::slice_head(n = 20) %>% pull(Target)
+target_top_neuro 
+target_counts_neuro
 

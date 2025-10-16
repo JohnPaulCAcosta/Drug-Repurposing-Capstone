@@ -53,7 +53,7 @@ system('git commit -m "Sync to friend repo"')
 # 3) Push your current branch to your friend's repo on branch 'isaac'
 usethis::use_git_remote("friend", "https://github.com/JohnPaulCAcosta/Drug-Repurposing-Capstone.git", overwrite = TRUE)
 br <- system('git branch --show-current', intern = TRUE)
-system(paste("git push -u friend", br, ":isaac"))
+system(paste("git push -u friend", br))
 
 # 4) Open PR page
 browseURL("https://github.com/JohnPaulCAcosta/Drug-Repurposing-Capstone/pull/new/isaac")

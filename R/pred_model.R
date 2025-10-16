@@ -1,159 +1,7 @@
 library(tidyverse)
 library(tidyverse)
 library(broom)
-
-# # ------------------------------------------------
-# # 1) Prepare outcome
-# # ------------------------------------------------
- neuro_launched <-neuro_launched %>%select(-parsed.SMILES)
- neuro_labeled <- neuro_launched %>%
-  mutate(
-    depression_flag = if_else(
-      str_detect(tolower(coalesce(indication, "")), "\\bdepression\\b"), 1L, 0L
-    )
-  )%>%select(-fp)
-
-# # ------------------------------------------------
-# # 2) Build feature matrix (your helper already)
-# # ------------------------------------------------
-# X_neuro <- neuro_labeled
-# y_neuro <- neuro_labeled$depression_flag
-# 
-# moa_counts_neuro <- neuro_labeled %>% dplyr::count(MOA, sort = TRUE)
-# moa_top_neuro <- moa_counts_neuro %>% dplyr::slice_head(n = 20) %>% pull(MOA)
-# moa_top_neuro 
-# moa_counts_neuro
-# 
-# target_counts_neuro <- neuro_labeled %>% dplyr::count(Target, sort = TRUE)
-# target_top_neuro <- target_counts_neuro %>% dplyr::slice_head(n = 20) %>% pull(Target)
-# target_top_neuro 
-# target_counts_neuro
-# 
-# 
-# # ---- pick top-20 MOA and Target (UNGROUPED: split by commas first)
-# moa_top_neuro <- neuro_labeled %>%
-#   separate_rows(MOA, sep = ",\\s*") %>%
-#   mutate(MOA = str_squish(MOA)) %>%
-#   filter(MOA != "") %>%
-#   dplyr::count(MOA, sort = TRUE) %>%
-#   slice_head(n = 10) %>%
-#   pull(MOA)
-# 
-# target_top_neuro <- neuro_labeled %>%
-#   separate_rows(Target, sep = ",\\s*") %>%
-#   mutate(Target = str_squish(Target)) %>%
-#   filter(Target != "") %>%
-#   dplyr::count(Target, sort = TRUE) %>%
-#   slice_head(n = 10) %>%
-#   pull(Target)
-# 
-# 
-# # ---- helper: case-insensitive multi-hot with canonical names ----
-# make_multi_hot_ci <- function(df, col, tokens, prefix) {
-#   if (length(tokens) == 0) return(tibble())
-#   canon <- tibble(tok = tokens, tok_lc = tolower(tokens))
-#   
-#   long <- df %>%
-#     mutate(.row_id = row_number()) %>%
-#     tidyr::separate_rows({{ col }}, sep = ",\\s*") %>%
-#     mutate(.tok = str_squish({{ col }}),
-#            .tok_lc = tolower(.tok)) %>%
-#     filter(.tok_lc != "")
-#   
-#   long_map <- long %>%
-#     inner_join(canon, by = c(".tok_lc" = "tok_lc")) %>%
-#     transmute(.row_id,
-#               key = paste0(prefix, janitor::make_clean_names(tok)),
-#               val = 1L) %>%
-#     distinct()
-#   
-#   out <- tibble(.row_id = seq_len(nrow(df))) %>%
-#     left_join(long_map, by = ".row_id") %>%
-#     select(-.row_id) %>%
-#     tidyr::pivot_wider(
-#       names_from  = key,
-#       values_from = val,
-#       # IMPORTANT: use a *named list* for older tidyr versions
-#       values_fill = list(val = 0L)
-#     )
-#   
-#   if (ncol(out) == 0) tibble() else dplyr::mutate(out, dplyr::across(dplyr::everything(), ~tidyr::replace_na(.x, 0L)))
-# }
-# 
-# # Re-run these (note: it's "moa_bin", not "oa_bin")
-# moa_bin  <- make_multi_hot_ci(neuro_labeled, MOA,    tokens = moa_top_neuro,    prefix = "moa_")
-# targ_bin <- make_multi_hot_ci(neuro_labeled, Target, tokens = target_top_neuro, prefix = "targ_")
-# 
-# 
-# # ---- outcome on launched ----
-# neuro_labeled <- neuro_launched %>%
-#   mutate(depression = as.integer(str_detect(tolower(coalesce(indication, "")), "\\bdepression\\b")))
-# 
-# # ---- ensure fingerprints exist ----
-# neuro_labeled <- neuro_labeled %>%
-#   mutate(first.SMILES = if (!"first.SMILES" %in% names(.)) purrr::map_chr(SMILES, ~ str_split(.x, ",\\s*")[[1]][[1]]) else first.SMILES)
-# 
-# if (!("parsed.SMILES" %in% names(neuro_labeled)) || any(purrr::map_lgl(neuro_labeled$parsed.SMILES, is.null))) {
-#   neuro_labeled <- neuro_labeled %>%
-#     mutate(parsed.SMILES = purrr::map(first.SMILES, ~ rcdk::parse.smiles(.x)[[1]])) %>%
-#     filter(!purrr::map_lgl(parsed.SMILES, is.null))
-# }
-# if (!("fp" %in% names(neuro_labeled)) || all(purrr::map_lgl(neuro_labeled$fp, is.null))) {
-#   neuro_labeled <- neuro_labeled %>%
-#     mutate(fp = purrr::map(parsed.SMILES, ~ fingerprint::get.fingerprint(.x, type = "extended")))
-# }
-# 
-# # ---- BUILD FEATURES: include physchem + MOA/Target + ALL fp_* ----
-# physchem <- neuro_labeled %>%
-#   mutate(across(c(mass, num.atoms, xlogp, tpsa), ~tidyr::replace_na(.x, 0))) %>%
-#   select(mass, num.atoms, xlogp, tpsa)
-# 
-# moa_bin  <- make_multi_hot_ci(neuro_labeled, MOA,    tokens = moa_top_neuro,    prefix = "moa_")
-# targ_bin <- make_multi_hot_ci(neuro_labeled, Target, tokens = target_top_neuro, prefix = "targ_")
-# fp_df    <- fp_to_df(neuro_labeled$fp)
-# 
-# X_glm_full <- bind_cols(physchem, moa_bin, targ_bin, fp_df)
-# 
-# # ---- ONLY trim near-zero variance on fingerprint bits (keep physchem & one-hots) ----
-# fp_cols <- grepl("^fp_", colnames(X_glm_full))
-# nzv_idx <- if (any(fp_cols)) caret::nearZeroVar(X_glm_full[, fp_cols, drop = FALSE]) else integer(0)
-# if (length(nzv_idx)) {
-#   # map nzv indices back to full colnames for fp subset
-#   drop_names <- colnames(X_glm_full)[fp_cols][nzv_idx]
-#   X_glm_full <- X_glm_full[, setdiff(colnames(X_glm_full), drop_names), drop = FALSE]
-# }
-# 
-# # ---- sanity check: you should now SEE these in names() ----
-# # print(colnames(X_glm_full)[1:50])  # optional
-# # stopifnot(all(c("mass","tpsa","xlogp","num.atoms") %in% colnames(X_glm_full)))
-# 
-# # ---- fit the GLM with ALL requested features ----
-# glm_df <- bind_cols(X_glm_full, depression = neuro_labeled$depression)
-# glm_fit_all <- glm(depression ~ ., data = glm_df, family = binomial())
-# 
-# summary(glm_fit_all)  # should now show mass/xlogp/tpsa + moa_* / targ_* + many fp_*
-# 
-# 
-# 
-# model.example = glm(
-#   data = neuro_launched,
-#   family = "binomial",
-#   formula = depression ~.)
-# 
-# #### Look at model output & summaries
-# 
-# summary(model.example)
-# 
-# 
-# 
-
-
-
-
-
-
-
-
+source(here("R", "clean_data.R"))
 
 # -------------------------------
 # Packages
@@ -459,8 +307,11 @@ scored <- non_proc %>%
          glm_pred = glm_score_pred,
          rf_pred  = rf_score_pred) %>%
   arrange(desc(avg_prob))
+scored_export <- dplyr::select(scored, where(~ !is.list(.)))
+write.csv(scored_export, "C:/Users/Isaac/Downloads/STAT 482/non_launched_neuro_predictions3.csv", row.names = FALSE)
+neuro_export <- dplyr::select(neuro_launched, where(~ !is.list(.)))
+write.csv(neuro_export, "C:/Users/Isaac/Downloads/STAT 482/neuro_launched2.csv", row.names = FALSE)
 
-write.csv(scored, "non_launched_neuro_predictions.csv", row.names = FALSE)
 cat("Saved: non_launched_neuro_predictions.csv\n")
 
 # optional: RF top importance
@@ -468,8 +319,45 @@ rf_imp <- importance(rf_fit)
 rf_imp_top <- as.data.frame(rf_imp) %>%
   rownames_to_column("feature") %>%
   arrange(desc(MeanDecreaseGini)) %>%
-  slice_head(n = 25)
+  slice_head(n = 100)
 print(rf_imp_top)
+
+
+
+# -------------------------------
+# Confusion Matrices (Test Set)
+# -------------------------------
+
+# Convert to factors with same positive class
+glm_te_pred_factor <- factor(glm_te_pred, levels = c(0, 1))
+rf_te_pred_factor  <- factor(rf_te_pred,  levels = c(0, 1))
+
+glm_true_factor <- factor(yg_te, levels = c(0, 1))
+rf_true_factor  <- factor(yf_te, levels = c(0, 1))
+
+# Confusion matrices
+cat("\n--- GLM Confusion Matrix (Test Set) ---\n")
+cm_glm <- confusionMatrix(glm_te_pred_factor, glm_true_factor, positive = "1")
+print(cm_glm)
+
+cat("\n--- Random Forest Confusion Matrix (Test Set) ---\n")
+cm_rf <- confusionMatrix(rf_te_pred_factor, rf_true_factor, positive = "1")
+print(cm_rf)
+
+
+
+glm_va_pred <- as.integer(glm_va_prob >= thr_glm)
+rf_va_pred  <- as.integer(rf_va_prob  >= thr_rf)
+
+cat("\n--- GLM Confusion Matrix (Validation Set) ---\n")
+print(confusionMatrix(factor(glm_va_pred, levels=c(0,1)),
+                      factor(yg_va, levels=c(0,1)),
+                      positive="1"))
+
+cat("\n--- Random Forest Confusion Matrix (Validation Set) ---\n")
+print(confusionMatrix(factor(rf_va_pred, levels=c(0,1)),
+                      factor(yf_va, levels=c(0,1)),
+                      positive="1"))
 
 
 
@@ -483,21 +371,21 @@ library(caret)
 
 # randomForest doesn't seem to like the `word1 word2` notation,
 # so we'll transform things to `word1.word2`
-names(all.drugs) = make.names(names(all.drugs))
-
-neuro.psych = all.drugs %>%
-  filter(str_detect(Disease.Area, "neurology/psychiatry"),
-         Phase == "Launched")
+# names(all.drugs) = make.names(names(all.drugs))
+# 
+# neuro.psych = all.drugs %>%
+#   filter(str_detect(Disease.Area, "neurology/psychiatry"),
+#          Phase == "Launched")
 
 #### Train/test splitting
 
-set.seed(0)
-names(neuro_launched) = make.names(names(neuro_launched))
+set.seed(1)
+
 n = nrow(neuro_launched)
 random.numbers = sample(1:n) # from 1 to length of the neuro.psych df
 
-train.index = random.numbers[1:floor(n*.80)]
-test.index = random.numbers[(floor(n*.80)+1):n]
+train.index = random.numbers[1:floor(n*.70)]
+test.index = random.numbers[(floor(n*.70)+1):n]
 
 training.drugs = neuro_launched[train.index,]
 testing.drugs = neuro_launched[test.index,]
@@ -536,86 +424,315 @@ top20_target <- training.drugs %>%
   slice_head(n = 20) %>%
   pull(Target)
 
-
 top20_moa
 top20_target
-predictors = c(
-  "SLC",
-   "HTR",
-  "HRH",
-   "CHR",
-  "ADR",
-  "serotonin.reuptake.inhibitor",
-  "norepinephrine.reuptake.inhibitor",
-  "monoamine.oxidase.inhibitor",
-   "sodium.channel.blocker"                              
-  ,"adrenergic.receptor.agonist"                         
-  , "adrenergic.receptor.antagonist"                      
-  , "dopamine.receptor.agonist"                           
-  , "histamine.receptor.antagonist"                       
-  , "monoamine.oxidase.inhibitor"                         
-  , "glutamate.receptor.antagonist"                       
-                      
-  , "acetylcholinesterase.inhibitor"                      
-  , "glucocorticoid.receptor.agonist"                     
-  , "phosphodiesterase.inhibitor"                         
-  , "norepinephrine.reuptake.inhibitor",                 
-  "DRD",
-  "xlogp",
-  "tpsa",
-  "num.atoms"
-)
 
-model.example = randomForest(
+# Build predictors automatically from top20_moa and top20_target
+
+# Clean up names safely (handles spaces, capitalization)
+library(janitor)
+
+# MOA columns (already binary flags in your dataset)
+moa_cols <- make_clean_names(tolower(top20_moa))        # "Serotonin Reuptake Inhibitor" -> "serotonin_reuptake_inhibitor"
+moa_cols <- intersect(moa_cols, make_clean_names(names(training.drugs)))  # keep existing ones
+moa_cols <- names(training.drugs)[make_clean_names(names(training.drugs)) %in% moa_cols]
+
+# Target family columns (SLC, HTR, HRH, DRD, etc.)
+# columns that are actual target-family flags in your data (no ".count")
+avail_targ_cols <- grep("^[A-Z]{3,4}$", names(training.drugs), value = TRUE)
+
+# roots from your top target strings (e.g., "HTR2A" -> "HTR2A" -> roots "HTR2A")
+roots <- gsub("[^A-Za-z].*$", "", top20_target)   # keep leading letters
+roots <- toupper(roots)
+
+# try 4-letter root first (e.g., "GABRA1" -> "GABR"), else 3-letter (e.g., "CHRM1" -> "CHR")
+cand4 <- substr(roots, 1, 4)
+cand3 <- substr(roots, 1, 3)
+
+mapped <- ifelse(cand4 %in% avail_targ_cols, cand4,
+                 ifelse(cand3 %in% avail_targ_cols, cand3, NA))
+
+targ_cols <- unique(na.omit(mapped))
+
+
+# Core molecular descriptors
+core_feats <- intersect(c("xlogp", "tpsa", "num.atoms", "mass"), names(training.drugs))
+
+# Final predictor list present in both train & test
+predictors <- unique(c(core_feats, targ_cols, moa_cols))
+predictors <- predictors[predictors %in% intersect(names(training.drugs), names(testing.drugs))]
+
+# Optional: check what got picked up
+print(predictors)
+length(predictors)
+
+
+# predictors = c(
+#   "SLC",
+#    "HTR",
+#   "HRH",
+#    "CHR",
+#   "ADR",
+#   "serotonin.reuptake.inhibitor",
+#   "norepinephrine.reuptake.inhibitor",
+#   "monoamine.oxidase.inhibitor",
+#    "sodium.channel.blocker"                              
+#   ,"adrenergic.receptor.agonist"                         
+#   , "adrenergic.receptor.antagonist"                      
+#   , "dopamine.receptor.agonist"                           
+#   , "histamine.receptor.antagonist"                       
+#   , "monoamine.oxidase.inhibitor"                         
+#   , "glutamate.receptor.antagonist"                       
+#                       
+#   , "acetylcholinesterase.inhibitor"                      
+#   , "glucocorticoid.receptor.agonist"                     
+#   , "phosphodiesterase.inhibitor"                         
+#   , "norepinephrine.reuptake.inhibitor",                 
+#   "DRD",
+#   "xlogp",
+#   "tpsa",
+#   "num.atoms"
+# )
+
+## ---- auto-pick top-N engineered features (no dataset changes)
+
+
+
+
+model.depression = randomForest(
   x = training.drugs[, predictors],
   y = as.factor(training.drugs$depression),
+  xtest = testing.drugs[, predictors],
+  ytest = as.factor(testing.drugs$depression),
   data = training.drugs,
   importance = TRUE,
   proximity = TRUE,
-  xtest = testing.drugs[, predictors],
-  ytest = as.factor(testing.drugs$depression)
 )
 
-model.example2 = randomForest(
+model.parkinsons = randomForest(
   x = training.drugs[, predictors],
-  y = as.factor(training.drugs$Parkinson.s.Disease),
+  y = as.factor(training.drugs$`Parkinson's Disease`),
   data = training.drugs,
+  xtest = testing.drugs[, predictors],
+  ytest = as.factor(testing.drugs$`Parkinson's Disease`),
   importance = TRUE,
   proximity = TRUE,
-  xtest = testing.drugs[, predictors],
-  ytest = as.factor(testing.drugs$Parkinson.s.Disease)
+  keep.forest= TRUE
 )
 
 
-model.example3 = randomForest(
+model.schizo = randomForest(
   x = training.drugs[, predictors],
   y = as.factor(training.drugs$schizophrenia),
   data = training.drugs,
+  xtest = testing.drugs[, predictors],
+  ytest = as.factor(testing.drugs$schizophrenia),
   importance = TRUE,
   proximity = TRUE,
-  xtest = testing.drugs[, predictors],
-  ytest = as.factor(testing.drugs$schizophrenia)
 )
 
 #### Look at model output & summaries
 
-summary(model.example)
-model.example$importance
+summary(model.depression)
+model.depression$importance
+
+summary(model.parkinsons)
+model.parkinsons$importance
+
+summary(model.schizo)
+model.schizo$importance
 
 # For reference:
 # Sensitivity = how good the model predicts the actually positive cases
 # Specificity = how good the model predicts the actually negative cases
 
-confusionMatrix(model.example$predicted, model.example$y, positive = "1")
+model.depression$importance
+depression.test = model.depression$test
+confusionMatrix(depression.test$predicted, as.factor(testing.drugs$depression), positive = "1")
 
-test.object = model.example$test
-votes = test.object$votes
 
-threshold = 0.4 # this can help us determine what probability we would say is
+confusionMatrix(model.depression$predicted, model.depression$y, positive = "1")
+
+test.object.d = model.depression$test
+vote.ds = test.object$votes
+
+threshold.d = 0.4 # this can help us determine what probability we would say is
 # "good enoough" to say a drug is able to be used for depression, somehow I think
 
-which(votes[,2] > threshold)
+which(votes.d[,2] > threshold.d)
 
-testing.drugs[which(votes[,2] > threshold), "indication"]
-testing.drugs[which(testing.drugs$schizophrenia == 1), "indication"]
+testing.drugs[which(votes.d[,2] > threshold.d), "indication"]
+testing.drugs[which(testing.drugs$depression == 1), "indication"]
 
+
+model.schizo$importance
+schizo.test = model.schizo$test
+confusionMatrix(schizo.test$predicted, as.factor(testing.drugs$schizophrenia), positive = "1")
+
+
+
+confusionMatrix(model.schizo$predicted, model.schizo$y, positive = "1")
+
+test.object.s = model.schizo$test
+votes.s = test.object.s$votes
+
+threshold.s = 0.4 # this can help us determine what probability we would say is
+# "good enoough" to say a drug is able to be used for depression, somehow I think
+
+which(votes.s[,2] > threshold.s)
+
+testing.drugs[which(votes.s[,2] > threshold.s), "indication"]
+testing.drugs[which(testing.drugs$schizophrenia== 1), "indication"]
+
+
+
+confusionMatrix(model.parkinsons$predicted, model.parkinsons$y, positive = "1")
+
+model.parkinsons$importance
+parkinsons.test = model.parkinsons$test
+confusionMatrix(parkinsons.test$predicted, as.factor(testing.drugs$`Parkinson's Disease`), positive = "1")
+
+test.object.p = model.parkinsons$test
+votes.p = test.object.p$votes
+
+threshold.p = 0.4 # this can help us determine what probability we would say is
+# "good enoough" to say a drug is able to be used for depression, somehow I think
+
+which(votes.p[,2] > threshold.s)
+
+testing.drugs[which(votes.p[,2] > threshold.p), "indication"]
+testing.drugs[which(testing.drugs$`Parkinson's Disease`== 1), "indication"]
+
+
+
+
+
+# -------------------------------
+# Predict on preclinical (non-launched) drugs
+# -------------------------------
+
+# Use the same predictors as your models
+X_pre <- non_proc[, predictors, drop = FALSE]
+
+# Predict probabilities
+pred_depr_prob <- predict(model.depression,  newdata = X_pre, type = "prob")[, "1"]
+pred_park_prob <- predict(model.parkinsons, newdata = X_pre, type = "prob")[, "1"]
+pred_scz_prob  <- predict(model.schizo,     newdata = X_pre, type = "prob")[, "1"]
+
+# Apply threshold (0.4 as in your test block)
+thr <- 0.4
+pred_depr_flag <- as.integer(pred_depr_prob >= thr)
+pred_park_flag <- as.integer(pred_park_prob >= thr)
+pred_scz_flag  <- as.integer(pred_scz_prob  >= thr)
+
+# Attach results to your non-launched data
+scored_preclinical <- non_launched_with_smiles %>%
+  mutate(
+    rf_depression_prob = pred_depr_prob,
+    rf_parkinsons_prob = pred_park_prob,
+    rf_schizophrenia_prob = pred_scz_prob,
+    rf_depression_pred = pred_depr_flag,
+    rf_parkinsons_pred = pred_park_flag,
+    rf_schizophrenia_pred = pred_scz_flag
+  ) %>%
+  arrange(desc(rf_depression_prob))
+
+# Export
+preclinical_scored <- dplyr::select(scored_preclinical, where(~ !is.list(.)))
+write.csv(preclinical_scored,
+          "C:/Users/Isaac/Downloads/STAT 482/preclinical_predictions_rf3.csv")
+
+cat("Saved: preclinical_predictions_rf3.csv\n")
+
+
+scored_preclinical_top <- scored_preclinical %>%
+  mutate(
+    top_indication = c("Depression", "Parkinsons", "Schizophrenia")[max.col(
+      cbind(rf_depression_prob, rf_parkinsons_prob, rf_schizophrenia_prob), ties.method = "first")]
+  )
+view(scored_preclinical_top)
+
+varImpPlot(model.depression, main="Feature Importance – Depression RF")
+ggplot(scored_preclinical, aes(x = rf_depression_prob, y = rf_schizophrenia_prob)) +
+  geom_point(alpha = 0.6) +
+  geom_abline(slope = 1, linetype = "dashed") +
+  labs(title = "Overlap: Depression vs Schizophrenia Models",
+       x = "Depression probability", y = "Schizophrenia probability")
+
+
+# -------------------------------
+# Summary Stats for Model Predictions
+# -------------------------------
+
+
+# Basic descriptive stats for each model
+summary_stats <- scored_preclinical %>%
+  summarise(
+    n_compounds = n(),
+    depression_mean = mean(rf_depression_prob, na.rm = TRUE),
+    depression_sd   = sd(rf_depression_prob, na.rm = TRUE),
+    depression_median = median(rf_depression_prob, na.rm = TRUE),
+    parkinsons_mean = mean(rf_parkinsons_prob, na.rm = TRUE),
+    parkinsons_sd   = sd(rf_parkinsons_prob, na.rm = TRUE),
+    parkinsons_median = median(rf_parkinsons_prob, na.rm = TRUE),
+    schizo_mean = mean(rf_schizophrenia_prob, na.rm = TRUE),
+    schizo_sd   = sd(rf_schizophrenia_prob, na.rm = TRUE),
+    schizo_median = median(rf_schizophrenia_prob, na.rm = TRUE)
+  )
+
+print(summary_stats)
+
+# -------------------------------
+# How many "high probability" hits per model
+# -------------------------------
+
+thr <- 0.6  # adjust threshold if you want
+high_hits <- scored_preclinical %>%
+  summarise(
+    n_depression_high  = sum(rf_depression_prob  >= thr, na.rm = TRUE),
+    n_parkinsons_high  = sum(rf_parkinsons_prob  >= thr, na.rm = TRUE),
+    n_schizo_high      = sum(rf_schizophrenia_prob >= thr, na.rm = TRUE)
+  )
+
+print(high_hits)
+
+# -------------------------------
+# Compare model outputs
+# -------------------------------
+
+# Correlation between models (how similar their predictions are)
+model_correlation <- scored_preclinical %>%
+  select(rf_depression_prob, rf_parkinsons_prob, rf_schizophrenia_prob) %>%
+  cor(use = "pairwise.complete.obs")
+
+print(model_correlation)
+
+# -------------------------------
+# Top predicted compounds per model
+# -------------------------------
+
+top_depression <- scored_preclinical %>%
+  arrange(desc(rf_depression_prob)) %>%
+  select(DrugName = Name, rf_depression_prob) %>%
+  head(10)
+
+top_parkinsons <- scored_preclinical %>%
+  arrange(desc(rf_parkinsons_prob)) %>%
+  select(DrugName = Name, rf_parkinsons_prob) %>%
+  head(10)
+
+top_schizo <- scored_preclinical %>%
+  arrange(desc(rf_schizophrenia_prob)) %>%
+  select(DrugName =Name, rf_schizophrenia_prob) %>%
+  head(10)
+
+cat("\n--- Top 10 Predicted Depression-like Compounds ---\n")
+print(top_depression)
+
+cat("\n--- Top 10 Predicted Parkinson’s-like Compounds ---\n")
+print(top_parkinsons)
+
+cat("\n--- Top 10 Predicted Schizophrenia-like Compounds ---\n")
+print(top_schizo)
+
+##data split, how u decide on tree, what results (confusion matrix)
