@@ -14,6 +14,16 @@ neuro.psych = all.drugs %>%
   filter(str_detect(Disease.Area, "neurology/psychiatry"),
          Phase == "Launched")
 
+#### Top indications
+
+neuro.psych %>% 
+  separate_rows(Indication, sep = ",\\s*") %>%
+  group_by(Indication) %>%
+  filter(n() >= 20) %>%
+  ungroup() %>%
+  ggplot(aes(y = Indication)) +
+  geom_histogram(stat = "count")
+
 #### Train/test splitting
 
 set.seed(0)
@@ -75,18 +85,19 @@ model.depression = randomForest(
 )
 
 # Peek at model output & summaries to see how good it is
-
 model.depression$importance
-
-# Make this but for the testing data
 confusionMatrix(model.depression$predicted, model.depression$y, positive = "1")
+
+# Confusion matrix for the testing data
+depression.test = model.depression$test
+confusionMatrix(depression.test$predicted, testing.drugs$depression, positive = "1")
 
 ## Parkinson's Disease
 
 predictors.parkinsons = c(
-  "HTR",
-  "DRD",
-  "ADR",
+  # "HTR",
+  # "DRD",
+  # "ADR",
   "dopamine.receptor.agonist",
   "xlogp",
   "tpsa",
@@ -104,11 +115,12 @@ model.parkinsons = randomForest(
 )
 
 # Peek at model output & summaries to see how good it is
-
 model.parkinsons$importance
-
-# Make this but for the testing data
 confusionMatrix(model.parkinsons$predicted, model.parkinsons$y, positive = "1")
+
+# Confusion matrix for the testing data
+parkinsons.test = model.parkinsons$test
+confusionMatrix(parkinsons.test$predicted, testing.drugs$Parkinson.s.Disease, positive = "1")
 
 ## Schizophrenia
 
@@ -133,22 +145,51 @@ model.schizophrenia = randomForest(
 )
 
 # Peek at model output & summaries to see how good it is
-
 model.schizophrenia$importance
-
-# Make this but for the testing data
 confusionMatrix(model.schizophrenia$predicted, model.schizophrenia$y, positive = "1")
 
-#### What are the results of our models?
+# Confusion matrix for the testing data
+schizophrenia.test = model.schizophrenia$test
+confusionMatrix(schizophrenia.test$predicted, testing.drugs$schizophrenia, positive = "1")
 
-test.object = model.depression$test
-votes = test.object$votes
+## Pain Relief
 
-threshold = 0.4 # this can help us determine what probability we would say is
-# "good enoough" to say a drug is able to be used for depression, somehow I think
+predictors.pain = c(
+  # "PTGS",
+  # "cyclooxygenase.inhibitor",
+  "xlogp",
+  "tpsa",
+  "num.atoms"
+)
 
-which(votes[,2] > threshold)
+model.pain = randomForest(
+  x = training.drugs[, predictors.pain],
+  y = as.factor(training.drugs$depression),
+  data = training.drugs,
+  importance = TRUE,
+  proximity = TRUE,
+  xtest = testing.drugs[, predictors.pain],
+  ytest = as.factor(testing.drugs$depression)
+)
 
-testing.drugs[which(votes[,2] > threshold), "Indication"]
-testing.drugs[which(testing.drugs$depression == 1), "Indication"]
+# Peek at model output & summaries to see how good it is
+model.pain$importance
+confusionMatrix(model.pain$predicted, model.pain$y, positive = "1")
+
+# Confusion matrix for the testing data
+pain.test = model.pain$test
+confusionMatrix(pain.test$predicted, testing.drugs$pain.relief, positive = "1")
+
+# #### What are the results of our models?
+# 
+# test.object = model.depression$test
+# votes = test.object$votes
+# 
+# threshold = 0.4 # this can help us determine what probability we would say is
+# # "good enoough" to say a drug is able to be used for depression, somehow I think
+# 
+# which(votes[,2] > threshold)
+# 
+# testing.drugs[which(votes[,2] > threshold), "Indication"]
+# testing.drugs[which(testing.drugs$depression == 1), "Indication"]
 
