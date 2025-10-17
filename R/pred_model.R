@@ -428,10 +428,6 @@ top20_moa
 top20_target
 
 # Build predictors automatically from top20_moa and top20_target
-
-# Clean up names safely (handles spaces, capitalization)
-library(janitor)
-
 # MOA columns (already binary flags in your dataset)
 moa_cols <- make_clean_names(tolower(top20_moa))        # "Serotonin Reuptake Inhibitor" -> "serotonin_reuptake_inhibitor"
 moa_cols <- intersect(moa_cols, make_clean_names(names(training.drugs)))  # keep existing ones
@@ -453,18 +449,90 @@ mapped <- ifelse(cand4 %in% avail_targ_cols, cand4,
                  ifelse(cand3 %in% avail_targ_cols, cand3, NA))
 
 targ_cols <- unique(na.omit(mapped))
-
+targ_col_count <-paste0(targ_cols, ".count")
 
 # Core molecular descriptors
 core_feats <- intersect(c("xlogp", "tpsa", "num.atoms", "mass"), names(training.drugs))
 
 # Final predictor list present in both train & test
-predictors <- unique(c(core_feats, targ_cols, moa_cols))
+predictors <- unique(c(core_feats, targ_cols, moa_cols,targ_col_count))
+# add to your predictors list (whatever you already had)
+predictors <- unique(c(predictors, chosen_fp))
 predictors <- predictors[predictors %in% intersect(names(training.drugs), names(testing.drugs))]
 
 # Optional: check what got picked up
 print(predictors)
 length(predictors)
+
+# Clean up names safely (handles spaces, capitalization)
+library(janitor)
+
+# keep your original fp_to_df(); add this tiny wrapper
+fp_to_df_fixed <- function(fp_list, ref_cols = NULL) {
+  df <- fp_to_df(fp_list)  # your OG function
+  if (is.null(ref_cols)) return(df)  # on TRAIN: learn columns
+  align_to_ref(df, as.data.frame(matrix(0, nrow=0, ncol=length(ref_cols),
+                                        dimnames=list(NULL, ref_cols))))
+}
+
+# TRAIN: learn the stable fp column names (this defines the reference)
+fp_train <- fp_to_df_fixed(neuro_launched$fp)
+fp_cols  <- colnames(fp_train)         # <- save these
+
+# (optional) bind into neuro_launched so you can inspect in a data frame
+neuro_launched_fp <- dplyr::bind_cols(neuro_launched, fp_train)
+
+# example manual picks (edit these)
+#chosen_fp <- c("fp_12", "fp_57", "fp_384", "fp_777", "fp_1012")
+
+# guard against typos
+#chosen_fp <- intersect(chosen_fp, fp_cols)
+fp_ref_cols <- grep("^fp_", colnames(X_train_full), value = TRUE)
+
+# Pick a few FP bits from big-model importance
+# (edit head(...) or supply your own vector)
+chosen_fp <- rf_imp_top$feature[grepl("^fp_", rf_imp_top$feature)]
+chosen_fp <- intersect(chosen_fp, fp_ref_cols)
+chosen_fp <- head(chosen_fp, 10)   # keep 4–5
+
+# Non-fingerprint predictors you already use
+nonfp_preds <- setdiff(predictors, fp_ref_cols)
+
+# --- Build aligned FP matrices for TRAIN/TEST of small models -----------------
+# Ensure fp list-columns exist; compute if missing
+if (!"fp" %in% names(training.drugs) || all(purrr::map_lgl(training.drugs$fp, is.null))) {
+  training.drugs <- training.drugs %>%
+    dplyr::mutate(fp = purrr::map(parsed.SMILES, ~ get.fingerprint(.x, type = "extended")))
+}
+if (!"fp" %in% names(testing.drugs) || all(purrr::map_lgl(testing.drugs$fp, is.null))) {
+  testing.drugs <- testing.drugs %>%
+    dplyr::mutate(fp = purrr::map(parsed.SMILES, ~ get.fingerprint(.x, type = "extended")))
+}
+
+# Raw fp frames (your original fp_to_df)
+fp_tr_small_raw <- fp_to_df(training.drugs$fp)
+fp_te_small_raw <- fp_to_df(testing.drugs$fp)
+
+# Align to big model's FP space so names/indices match
+fp_ref_dummy <- as.data.frame(matrix(0, nrow = 0, ncol = length(fp_ref_cols),
+                                     dimnames = list(NULL, fp_ref_cols)))
+fp_tr_small <- align_to_ref(fp_tr_small_raw, fp_ref_dummy)
+fp_te_small <- align_to_ref(fp_te_small_raw, fp_ref_dummy)
+
+# --- Design matrices for the small RFs (non-fp + your chosen fp bits) --------
+X_tr_small <- dplyr::bind_cols(
+  training.drugs[, nonfp_preds, drop = FALSE],
+  fp_tr_small[, chosen_fp, drop = FALSE]
+)
+X_te_small <- dplyr::bind_cols(
+  testing.drugs[,  nonfp_preds, drop = FALSE],
+  fp_te_small[, chosen_fp, drop = FALSE]
+)
+
+
+
+
+
 
 
 # predictors = c(
@@ -500,21 +568,16 @@ length(predictors)
 
 
 model.depression = randomForest(
-  x = training.drugs[, predictors],
-  y = as.factor(training.drugs$depression),
-  xtest = testing.drugs[, predictors],
-  ytest = as.factor(testing.drugs$depression),
-  data = training.drugs,
+  x = X_tr_small, y = as.factor(training.drugs$depression),
+  xtest = X_te_small, ytest = as.factor(testing.drugs$depression),
   importance = TRUE,
   proximity = TRUE,
+  keep.forest = TRUE
 )
 
 model.parkinsons = randomForest(
-  x = training.drugs[, predictors],
-  y = as.factor(training.drugs$`Parkinson's Disease`),
-  data = training.drugs,
-  xtest = testing.drugs[, predictors],
-  ytest = as.factor(testing.drugs$`Parkinson's Disease`),
+  x = X_tr_small, y = as.factor(training.drugs$`Parkinson's Disease`),
+  xtest = X_te_small, ytest = as.factor(testing.drugs$`Parkinson's Disease`),
   importance = TRUE,
   proximity = TRUE,
   keep.forest= TRUE
@@ -522,13 +585,11 @@ model.parkinsons = randomForest(
 
 
 model.schizo = randomForest(
-  x = training.drugs[, predictors],
-  y = as.factor(training.drugs$schizophrenia),
-  data = training.drugs,
-  xtest = testing.drugs[, predictors],
-  ytest = as.factor(testing.drugs$schizophrenia),
+  x = X_tr_small, y = as.factor(training.drugs$schizophrenia),
+  xtest = X_te_small, ytest = as.factor(testing.drugs$schizophrenia),
   importance = TRUE,
   proximity = TRUE,
+  keep.forest = TRUE
 )
 
 #### Look at model output & summaries
@@ -554,7 +615,7 @@ confusionMatrix(depression.test$predicted, as.factor(testing.drugs$depression), 
 confusionMatrix(model.depression$predicted, model.depression$y, positive = "1")
 
 test.object.d = model.depression$test
-vote.ds = test.object$votes
+votes.d = test.object$votes
 
 threshold.d = 0.4 # this can help us determine what probability we would say is
 # "good enoough" to say a drug is able to be used for depression, somehow I think
@@ -598,7 +659,7 @@ votes.p = test.object.p$votes
 threshold.p = 0.4 # this can help us determine what probability we would say is
 # "good enoough" to say a drug is able to be used for depression, somehow I think
 
-which(votes.p[,2] > threshold.s)
+which(votes.p[,2] > threshold.p)
 
 testing.drugs[which(votes.p[,2] > threshold.p), "indication"]
 testing.drugs[which(testing.drugs$`Parkinson's Disease`== 1), "indication"]
@@ -612,12 +673,33 @@ testing.drugs[which(testing.drugs$`Parkinson's Disease`== 1), "indication"]
 # -------------------------------
 
 # Use the same predictors as your models
-X_pre <- non_proc[, predictors, drop = FALSE]
+fp_pre_raw <- fp_to_df(non_proc$fp)                  # your existing fp_to_df()
+fp_pre     <- align_to_ref(fp_pre_raw, fp_ref_dummy) # force same fp_* names/order as training
 
-# Predict probabilities
-pred_depr_prob <- predict(model.depression,  newdata = X_pre, type = "prob")[, "1"]
-pred_park_prob <- predict(model.parkinsons, newdata = X_pre, type = "prob")[, "1"]
-pred_scz_prob  <- predict(model.schizo,     newdata = X_pre, type = "prob")[, "1"]
+# --- attach FP cols to non_proc (no MOA/Target bin building here) ---
+non_proc_scoring <- dplyr::bind_cols(
+  non_proc,
+  fp_pre[, fp_ref_cols, drop = FALSE]
+)
+
+# NOTE: 'predictors' should already include whatever you want:
+#   - your existing protein/bin/count columns that are ALREADY in the dataset
+#   - the chosen fp_* bits you picked (subset of fp_ref_cols), e.g. chosen_fp
+# Make sure 'predictors' only contains columns present in both training.drugs and testing.drugs
+# as you already did earlier.
+
+# --- build the exact matrix for your small models ---
+X_pre_small <- non_proc_scoring[, predictors, drop = FALSE]
+
+# (recommended) final safety: align to the small-model train design to avoid mismatches
+X_pre_small <- align_to_ref(X_pre_small, X_tr_small)
+
+X_pre_small <- X_pre_small[, colnames(X_tr_small), drop = FALSE]
+
+# Predict probabilities with the small models (use X_pre_small, not X_pre)
+pred_depr_prob <- predict(model.depression,  newdata = X_pre_small, type = "prob")[, "1"]
+pred_park_prob <- predict(model.parkinsons, newdata = X_pre_small, type = "prob")[, "1"]
+pred_scz_prob  <- predict(model.schizo,     newdata = X_pre_small, type = "prob")[, "1"]
 
 # Apply threshold (0.4 as in your test block)
 thr <- 0.4
@@ -736,3 +818,224 @@ cat("\n--- Top 10 Predicted Schizophrenia-like Compounds ---\n")
 print(top_schizo)
 
 ##data split, how u decide on tree, what results (confusion matrix)
+
+# After you fit once, you can prune & refit:
+prune_by_importance <- function(imp_df, keep_n = 30, min_gini = .3) {
+  imp_df %>%
+    tibble::rownames_to_column("feature") %>%
+    arrange(desc(MeanDecreaseGini)) %>%
+    filter(MeanDecreaseGini >= min_gini) %>%
+    slice_head(n = keep_n) %>%
+    pull(feature)
+}
+impdep <- importance(model.depression) %>% as.data.frame()
+impdep<- prune_by_importance(impdep)
+impdep
+
+imppark <- importance(model.parkinsons) %>% as.data.frame()
+imppark<- prune_by_importance(imppark)
+imppark
+
+imps <- importance(model.schizo) %>% as.data.frame()
+imps<- prune_by_importance(imps)
+imps
+
+# ===== Refit the three small RFs using pruned variables =====
+
+# 0) safety: intersect pruned lists with available columns
+keep_dep  <- intersect(colnames(X_tr_small), impdep)
+keep_park <- intersect(colnames(X_tr_small), imppark)
+keep_scz  <- intersect(colnames(X_tr_small), imps)
+
+# 1) build pruned design matrices (train/test) — same structure as before
+Xd_tr <- X_tr_small[, keep_dep,  drop = FALSE]
+Xd_te <- X_te_small[, keep_dep,  drop = FALSE]
+
+Xp_tr <- X_tr_small[, keep_park, drop = FALSE]
+Xp_te <- X_te_small[, keep_park, drop = FALSE]
+
+Xs_tr <- X_tr_small[, keep_scz,  drop = FALSE]
+Xs_te <- X_te_small[, keep_scz,  drop = FALSE]
+
+
+
+# 3) REFIT (same objects, same structure, just with pruned X_* matrices)
+set.seed(1)
+model.depression2 = randomForest(
+  x = Xd_tr, y = as.factor(training.drugs$depression),
+  xtest = Xd_te, ytest = as.factor(testing.drugs$depression),
+  importance = TRUE,
+  proximity = TRUE,
+  keep.forest = TRUE
+)
+
+model.parkinsons2 = randomForest(
+  x = Xp_tr, y = as.factor(training.drugs$`Parkinson's Disease`),
+  xtest = Xp_te, ytest = as.factor(testing.drugs$`Parkinson's Disease`),
+  importance = TRUE,
+  proximity = TRUE,
+  keep.forest = TRUE
+)
+
+model.schizo2 = randomForest(
+  x = Xs_tr, y = as.factor(training.drugs$schizophrenia),
+  xtest = Xs_te, ytest = as.factor(testing.drugs$schizophrenia),
+  importance = TRUE,
+  proximity = TRUE,
+  keep.forest = TRUE
+)
+
+
+
+library(caret)
+library(pROC)
+
+# helper: pick Youden J threshold (guard for degenerate probs)
+best_thr <- function(y, p) {
+  if (length(unique(p)) < 2) return(0.5)
+  r <- roc(y, p, quiet = TRUE)
+  as.numeric(coords(r, x = "best", best.method = "youden", ret = "threshold"))
+}
+
+eval_rf <- function(model, Xtr, ytr, Xte, yte, label = "") {
+  ytr <- factor(ytr, levels = c(0,1))
+  yte <- factor(yte, levels = c(0,1))
+  
+  # ---- probabilities
+  p_tr <- predict(model, newdata = Xtr, type = "prob")[, "1"]
+  p_te <- predict(model, newdata = Xte, type = "prob")[, "1"]
+  
+  # ---- AUCs
+  auc_tr <- if (length(unique(p_tr)) > 1) as.numeric(auc(ytr, p_tr)) else NA_real_
+  auc_te <- if (length(unique(p_te)) > 1) as.numeric(auc(yte, p_te)) else NA_real_
+  
+  # ---- thresholds
+  thr_te <- best_thr(yte, p_te)   # choose on TEST (you can swap to validation if you prefer)
+  thr50  <- 0.5
+  
+  # ---- predictions @ thresholds
+  pred_tr_50 <- factor(as.integer(p_tr >= thr50), levels = c(0,1))
+  pred_te_50 <- factor(as.integer(p_te >= thr50), levels = c(0,1))
+  
+  pred_tr_bt <- factor(as.integer(p_tr >= thr_te), levels = c(0,1))
+  pred_te_bt <- factor(as.integer(p_te >= thr_te), levels = c(0,1))
+  
+  # ---- confusion matrices
+  cm_tr_50 <- confusionMatrix(pred_tr_50, ytr, positive = "1")
+  cm_te_50 <- confusionMatrix(pred_te_50, yte, positive = "1")
+  
+  cm_tr_bt <- confusionMatrix(pred_tr_bt, ytr, positive = "1")
+  cm_te_bt <- confusionMatrix(pred_te_bt, yte, positive = "1")
+  
+  # ---- OOB (last row of err.rate)
+  oob <- tryCatch({
+    er <- model$err.rate
+    if (is.null(er)) NA_real_ else er[nrow(er), "OOB"]
+  }, error = function(e) NA_real_)
+  
+  cat("\n==============================\n")
+  cat(sprintf("Model: %s\n", label))
+  cat("------------------------------\n")
+  cat(sprintf("OOB error (rf): %s\n", ifelse(is.na(oob), "NA", sprintf("%.3f", oob))))
+  cat(sprintf("AUC  Train: %s | Test: %s\n",
+              ifelse(is.na(auc_tr), "NA", sprintf("%.3f", auc_tr)),
+              ifelse(is.na(auc_te), "NA", sprintf("%.3f", auc_te))))
+  cat(sprintf("Test-derived best threshold (Youden J): %.3f\n\n", thr_te))
+  
+  cat("--- Confusion Matrix @ 0.5 (TRAIN) ---\n"); print(cm_tr_50$table)
+  cat(sprintf("Accuracy: %.3f  Sens: %.3f  Spec: %.3f\n\n",
+              cm_tr_50$overall["Accuracy"],
+              cm_tr_50$byClass["Sensitivity"],
+              cm_tr_50$byClass["Specificity"]))
+  
+  cat("--- Confusion Matrix @ 0.5 (TEST) ---\n"); print(cm_te_50$table)
+  cat(sprintf("Accuracy: %.3f  Sens: %.3f  Spec: %.3f\n\n",
+              cm_te_50$overall["Accuracy"],
+              cm_te_50$byClass["Sensitivity"],
+              cm_te_50$byClass["Specificity"]))
+  
+  cat("--- Confusion Matrix @ BestThr (TRAIN) ---\n"); print(cm_tr_bt$table)
+  cat(sprintf("Accuracy: %.3f  Sens: %.3f  Spec: %.3f\n\n",
+              cm_tr_bt$overall["Accuracy"],
+              cm_tr_bt$byClass["Sensitivity"],
+              cm_tr_bt$byClass["Specificity"]))
+  
+  cat("--- Confusion Matrix @ BestThr (TEST) ---\n"); print(cm_te_bt$table)
+  cat(sprintf("Accuracy: %.3f  Sens: %.3f  Spec: %.3f\n",
+              cm_te_bt$overall["Accuracy"],
+              cm_te_bt$byClass["Sensitivity"],
+              cm_te_bt$byClass["Specificity"]))
+  
+  invisible(list(
+    auc_train = auc_tr, auc_test = auc_te,
+    thr_test = thr_te,
+    cm_train_05 = cm_tr_50, cm_test_05 = cm_te_50,
+    cm_train_bt = cm_tr_bt, cm_test_bt = cm_te_bt
+  ))
+}
+
+# ==== run evals on your three NEW models ====
+res_dep  <- eval_rf(model.depression2,  Xd_tr, training.drugs$depression,            Xd_te, testing.drugs$depression,            label = "Depression")
+res_park <- eval_rf(model.parkinsons2,  Xp_tr, training.drugs$`Parkinson's Disease`,  Xp_te, testing.drugs$`Parkinson's Disease`,  label = "Parkinson's")
+res_scz  <- eval_rf(model.schizo2,      Xs_tr, training.drugs$schizophrenia,          Xs_te, testing.drugs$schizophrenia,          label = "Schizophrenia")
+
+
+
+model.depression2$importance
+depression2.test = model.depression2$test
+confusionMatrix(depression2.test$predicted, as.factor(testing.drugs$depression), positive = "1")
+
+
+confusionMatrix(model.depression2$predicted, model.depression2$y, positive = "1")
+
+test.object.d2 = model.depression2$test
+votes.d2 = test.object.d2$votes
+
+threshold.d2 = 0.4 # this can help us determine what probability we would say is
+# "good enoough" to say a drug is able to be used for depression, somehow I think
+
+which(votes.d2[,2] > threshold.d2)
+
+testing.drugs[which(votes.d2[,2] > threshold.d2), "indication"]
+testing.drugs[which(testing.drugs$depression == 1), "indication"]
+
+
+model.schizo2$importance
+schizo.test2 = model.schizo2$test
+confusionMatrix(schizo.test2$predicted, as.factor(testing.drugs$schizophrenia), positive = "1")
+
+
+
+confusionMatrix(model.schizo2$predicted, model.schizo2$y, positive = "1")
+
+test.object.s2 = model.schizo2$test
+votes.s2 = test.object.s2$votes
+
+threshold.s2 = 0.4 # this can help us determine what probability we would say is
+# "good enoough" to say a drug is able to be used for depression, somehow I think
+
+which(votes.s2[,2] > threshold.s2)
+
+testing.drugs[which(votes.s2[,2] > threshold.s2), "indication"]
+testing.drugs[which(testing.drugs$schizophrenia== 1), "indication"]
+
+
+
+confusionMatrix(model.parkinsons2$predicted, model.parkinsons2$y, positive = "1")
+
+model.parkinsons2$importance
+parkinsons.test2 = model.parkinsons2$test
+confusionMatrix(parkinsons.test2$predicted, as.factor(testing.drugs$`Parkinson's Disease`), positive = "1")
+
+test.object.p2 = model.parkinsons2$test
+votes.p2 = test.object.p2$votes
+
+threshold.p2 = 0.4 # this can help us determine what probability we would say is
+# "good enoough" to say a drug is able to be used for depression, somehow I think
+
+which(votes.p2[,2] > threshold.p2)
+
+testing.drugs[which(votes.p2[,2] > threshold.p2), "indication"]
+testing.drugs[which(testing.drugs$`Parkinson's Disease`== 1), "indication"]
+
+
