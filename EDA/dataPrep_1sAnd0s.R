@@ -288,6 +288,23 @@ for (moa in np.moas) {
   
 }
 
+#### MACCs fingerprints, these are more interpretable I think, looking into what
+# 'extended' meant, there's some hashing and hopefully this way we can still
+# get some performance boosts while actually giving a meaning
+
+fp_to_df <- function(fp_list) {
+  if (length(fp_list) == 0) return(tibble())
+  mat <- fingerprint::fp.to.matrix(fp_list)
+  mat <- as.matrix(mat)
+  colnames(mat) <- paste0("fp_", seq_len(ncol(mat)))
+  as.data.frame(mat)
+}
+
+fingerprints = map(all.drugs$parsed.SMILES, ~ get.fingerprint(.x, type = "maccs"))
+
+all.drugs = cbind(all.drugs, fp_to_df(fingerprints))
+
+
 
 # all.drugs %>%
 #   select(-first.SMILES, -parsed.SMILES) %>%

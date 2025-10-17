@@ -118,3 +118,14 @@ all.drugs %>%
         strip.text = element_text(size = 14)) +
   guides(fill = "none")
 
+
+#### Top indications
+
+# neuro.psych %>% 
+#   separate_rows(Indication, sep = ",\\s*") %>%
+#   group_by(Indication) %>%
+#   filter(n() >= 20) %>%
+#   ungroup() %>%
+#   ggplot(aes(y = Indication)) +
+#   geom_histogram(stat = "count")
+
