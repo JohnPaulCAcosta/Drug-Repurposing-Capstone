@@ -4,8 +4,6 @@ library(caret)
 library(rpart)
 library(rpart.plot)
 
-?randomForest
-
 # Run dataPrep_1sAnd0s.R for all.drugs 
 
 # randomForest doesn't seem to like the `word1 word2` notation,
@@ -116,13 +114,13 @@ predictors.depression = c(
   "tpsa" ,
   "num.atoms",
   # f.numbers # ,
-  "fp_19",
+  "fp_19", # presence of a 7 membered ring
   # "fp_58",
-  "fp_82",
-  "fp_104",
-  "fp_144",
-  "fp_154",
-  "fp_156"
+  "fp_82", # presence of a methylene group bridging together a two heavy atoms, one of which is bonded to hydrogen
+  "fp_104", # presence of two heavys atom bonded to hydrogen connected by methylene and a heavy atom 
+  "fp_144", # presence of three non-aromatic atoms chained together
+  "fp_154", # presence of a carbonyl group
+  "fp_156" # presence of a nitrogen atom bonded to three heavy atoms
 )
 
 model.depression = randomForest(
@@ -158,7 +156,7 @@ predictors.parkinsons = c(
   "tpsa",
   "num.atoms",
   # f.numbers # ,
-  "fp_17"# ,
+  "fp_17" #, # presence of a carbon atom triple bonded to another carbon atom
   # "fp_54",
   # "fp_91",
   # "fp_96" #,
@@ -187,39 +185,46 @@ confusionMatrix(parkinsons.model.test$predicted, parkinsons.test$Parkinson.s.Dis
 
 ## Schizophrenia
 
+set.seed(0)
+
 predictors.schizophrenia = c(
   # "HTR",
   "HTR.count",
+  # "HRH",
+  # "HRH.count",
   # "DRD",
-  "DRD.count",
+  # "DRD.count",
+  # "CHR",
+  # "CHR.count",
   # "ADR",
-  "ADR.count",
+  # "ADR.count",
   "dopamine.receptor.antagonist",
-  # "xlogp",
-  # "tpsa",
+  "serotonin.receptor.antagonist",
+  "xlogp",
+  "tpsa"#,
   # "num.atoms",
   # f.numbers # ,
-  "fp_19",
+  # "fp_19",
   # "fp_41",
-  "fp_57",
-  "fp_66",
-  "fp_74",
+  # "fp_57",
+  # "fp_66",
+  # "fp_74",
   # "fp_75",
-  "fp_82",
-  "fp_93",
-  "fp_95",
-  "fp_98",
-  "fp_104",
-  "fp_105",
-  "fp_111",
-  "fp_113",
-  "fp_120",
-  "fp_121",
-  "fp_128",
-  "fp_144",
-  "fp_147",
-  "fp_154",
-  "fp_156"
+  # "fp_82",
+  # "fp_93",
+  # "fp_95",
+  # "fp_98",
+  # "fp_104",
+  # "fp_105",
+  # "fp_111",
+  # "fp_113",
+  # "fp_120",
+  # "fp_121",
+  # "fp_128",
+  # "fp_144",
+  # "fp_147",
+  # "fp_154",
+  # "fp_156"
 )
 
 model.schizophrenia = randomForest(
@@ -234,20 +239,62 @@ model.schizophrenia = randomForest(
 
 # Peek at model output & summaries to see how good it is
 model.schizophrenia$importance
+confusionMatrix(model.schizophrenia$predicted, model.schizophrenia$y, positive = "1")
 
 # Confusion matrix for the testing data
 schizophrenia.model.test = model.schizophrenia$test
 confusionMatrix(schizophrenia.model.test$predicted, schizophrenia.test$schizophrenia, positive = "1")
 
+### Rename fingerprints for plots
+
+names(depression.train)[names(depression.train) == "SLC.count"] = "# of SLC Target Proteins"
+names(depression.train)[names(depression.train) == "monoamine.oxidase.inhibitor"] = "Monoamine Oxidase Inhibitor"
+names(depression.train)[names(depression.train) == "fp_19"] = "7M Ring"
+names(depression.train)[names(depression.train) == "fp_154"] = "Presence of Carbonyl Group"
+names(depression.train)[names(depression.train) == "fp_156"] = "Presence of Nitrogen Connected to 2 Other Atoms"
+
+predictors.depression[which(predictors.depression == "SLC.count")] = "# of SLC Target Proteins"
+predictors.depression[which(predictors.depression == "monoamine.oxidase.inhibitor")] = "Monoamine Oxidase Inhibitor"
+predictors.depression[which(predictors.depression == "fp_19")] = "7M Ring"
+predictors.depression[which(predictors.depression == "fp_154")] = "Presence of Carbonyl Group"
+predictors.depression[which(predictors.depression == "fp_156")] = "Presence of Nitrogen Connected to 2 Other Atoms"
+
+names(parkinsons.train)[names(parkinsons.train) == "SLC.count"] = "# of SLC Target Proteins"
+names(parkinsons.train)[names(parkinsons.train) == "dopamine.receptor.agonist"] = "Dopamine Receptor Agonist"
+
+predictors.parkinsons[which(predictors.parkinsons == "SLC.count")] = "# of SLC Target Proteins"
+predictors.parkinsons[which(predictors.parkinsons == "dopamine.receptor.agonist")] = "Dopamine Receptor Agonist"
+
 #### Single trees using rpart
 
-set.seed(1234)
+set.seed(0)
 
 # Depression
 depression.tree = rpart(
-  formula = as.formula(paste("depression ~", paste(predictors.depression, collapse = "+"))),
+  formula = as.formula(paste0("depression ~", "`",paste0(predictors.depression, collapse = "`+`"), "`")),
                         data = depression.train[, c("depression", predictors.depression)],
   method = "class"
 )
 
 rpart.plot(depression.tree)
+title(main = "Depression Tree")
+
+# Parkinson's Disease
+parkinsons.tree = rpart(
+  formula = as.formula(paste0("Parkinson.s.Disease ~", "`",paste0(predictors.parkinsons, collapse = "`+`"), "`")),
+  data = parkinsons.train[, c("Parkinson.s.Disease", predictors.parkinsons)],
+  method = "class"
+)
+
+rpart.plot(parkinsons.tree)
+title(main = "Parkinson's Disease Tree")
+
+# Schizophrenia
+schizophrenia.tree = rpart(
+  formula = as.formula(paste0("Parkinson.s.Disease ~", "`",paste0(predictors.schizophrenia, collapse = "`+`"), "`")),
+  data = schizophrenia.train[, c("Parkinson.s.Disease", predictors.schizophrenia)],
+  method = "class"
+)
+
+rpart.plot(schizophrenia.tree)
+title(main = "Schizophrenia Tree")
