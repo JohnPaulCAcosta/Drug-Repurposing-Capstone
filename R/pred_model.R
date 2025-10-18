@@ -1040,6 +1040,18 @@ parkinsons.test2 = model.parkinsons2$test
 confusionMatrix(parkinsons.test2$predicted, as.factor(testing.drugs$`Parkinson's Disease`), positive = "1")
 confusionMatrix(model.parkinsons2$predicted, model.parkinsons2$y, positive = "1")
 
+colnames(X_tr_small) <- make.names(colnames(X_tr_small))
+schizophrenia.tree2 <- rpart(
+  schizophrenia ~ .,
+  data = cbind(schizophrenia = factor(training.drugs$schizophrenia, levels = c(0,1)),
+               X_tr_small),
+  method = "class"
+)
+
+
+rpart.plot(schizophrenia.tree2)
+title(main = "Schizophrenia Tre2e")
+
 
 
 
