@@ -115,7 +115,7 @@ top20_target <- neuro_launched %>%
 #   - binary columns for top-20 Targets (prefix "targ_")
 #   - fingerprint bits (fp_*)
 #   - physchem numerics
-build_features_full <- function(df, top_moa, top_targ, fp_type = "extended") {
+build_features_full <- function(df, top_moa, top_targ, fp_type = "maccs") {
   # Physchem
   base_feats <- df %>% 
     mutate(across(c(mass, num.atoms, xlogp, tpsa), ~replace_na(., 0))) %>%
@@ -126,12 +126,7 @@ build_features_full <- function(df, top_moa, top_targ, fp_type = "extended") {
   targ_bin  <- make_multi_hot(df, Target, tokens = top_targ, prefix = "targ_")
   
   # Fingerprints: compute if not present, else reuse
-  fps <- if ("fp" %in% names(df) && !all(map_lgl(df$fp, is.null))) {
-    df$fp
-  } else {
-    # compute fingerprints from parsed.SMILES (assumes present & non-null)
-    map(df$parsed.SMILES, ~ get.fingerprint(.x, type = fp_type))
-  }
+  fps <- map(df$parsed.SMILES, ~ get.fingerprint(.x, type = fp_type))
   fp_df <- fp_to_df(fps)
   
   # Bind everything
@@ -148,7 +143,7 @@ X_train_full <- build_features_full(
   df = neuro_launched,
   top_moa = top20_moa,
   top_targ = top20_target,
-  fp_type = "extended"   # could be "maccs" if you want MACCS keys instead
+  fp_type = "maccs"   # could be "maccs" if you want MACCS keys instead
 )
 
 # Example outcome (you already set this in earlier code)
@@ -171,7 +166,7 @@ non_proc <- non_launched_with_smiles %>%
   mutate(
     mass      = map_dbl(parsed.SMILES, get.exact.mass),
     num.atoms = map_dbl(parsed.SMILES, get.atom.count),
-    fp        = map(parsed.SMILES, ~ get.fingerprint(.x, type = "extended")),
+    fp        = map(parsed.SMILES, ~ get.fingerprint(.x, type = "maccs")),
     xlogp     = map_dbl(parsed.SMILES, get.xlogp),
     tpsa      = map_dbl(parsed.SMILES, get.tpsa)
   )
@@ -180,7 +175,7 @@ X_score_full_raw <- build_features_full(
   df = non_proc,
   top_moa = top20_moa,
   top_targ = top20_target,
-  fp_type = "extended"
+  fp_type = "maccs"
 )
 
 # Align to training columns (very important!)
@@ -408,7 +403,7 @@ top20_moa <- training.drugs %>%
   summarise(n = n(), .groups = "drop") %>%
   arrange(desc(n)) %>%
   distinct(MOA_lc, .keep_all = TRUE) %>%  # one canonical per lowercase
-  slice_head(n = 20) %>%
+  slice_head(n = 50) %>%
   pull(MOA)
 
 # Top 20 Target proteins
@@ -421,7 +416,7 @@ top20_target <- training.drugs %>%
   summarise(n = n(), .groups = "drop") %>%
   arrange(desc(n)) %>%
   distinct(Target_lc, .keep_all = TRUE) %>%
-  slice_head(n = 20) %>%
+  slice_head(n = 50) %>%
   pull(Target)
 
 top20_moa
@@ -468,19 +463,22 @@ length(predictors)
 library(janitor)
 
 # keep your original fp_to_df(); add this tiny wrapper
-fp_to_df_fixed <- function(fp_list, ref_cols = NULL) {
-  df <- fp_to_df(fp_list)  # your OG function
-  if (is.null(ref_cols)) return(df)  # on TRAIN: learn columns
-  align_to_ref(df, as.data.frame(matrix(0, nrow=0, ncol=length(ref_cols),
-                                        dimnames=list(NULL, ref_cols))))
-}
+# fp_to_df_fixed <- function(fp_list, ref_cols = NULL) {
+#   df <- fp_to_df(fp_list)  # your OG function
+#   if (is.null(ref_cols)) return(df)  # on TRAIN: learn columns
+#   align_to_ref(df, as.data.frame(matrix(0, nrow=0, ncol=length(ref_cols),
+#                                         dimnames=list(NULL, ref_cols))))
+# }
+
+fingerprints = map(neuro_launched$parsed.SMILES, ~ get.fingerprint(.x, type = "maccs"))
+
+neuro_launched_fp = cbind(neuro_launched, fp_to_df(fingerprints))
 
 # TRAIN: learn the stable fp column names (this defines the reference)
-fp_train <- fp_to_df_fixed(neuro_launched$fp)
+fp_train <- fp_to_df(fingerprints)
 fp_cols  <- colnames(fp_train)         # <- save these
 
-# (optional) bind into neuro_launched so you can inspect in a data frame
-neuro_launched_fp <- dplyr::bind_cols(neuro_launched, fp_train)
+
 
 # example manual picks (edit these)
 #chosen_fp <- c("fp_12", "fp_57", "fp_384", "fp_777", "fp_1012")
@@ -494,20 +492,19 @@ fp_ref_cols <- grep("^fp_", colnames(X_train_full), value = TRUE)
 chosen_fp <- rf_imp_top$feature[grepl("^fp_", rf_imp_top$feature)]
 chosen_fp <- intersect(chosen_fp, fp_ref_cols)
 chosen_fp <- head(chosen_fp, 10)   # keep 4–5
-
+chosen_fp
+chosen_fp2<- fp_cols
+chosen_fp
 # Non-fingerprint predictors you already use
 nonfp_preds <- setdiff(predictors, fp_ref_cols)
 
 # --- Build aligned FP matrices for TRAIN/TEST of small models -----------------
-# Ensure fp list-columns exist; compute if missing
-if (!"fp" %in% names(training.drugs) || all(purrr::map_lgl(training.drugs$fp, is.null))) {
+
   training.drugs <- training.drugs %>%
-    dplyr::mutate(fp = purrr::map(parsed.SMILES, ~ get.fingerprint(.x, type = "extended")))
-}
-if (!"fp" %in% names(testing.drugs) || all(purrr::map_lgl(testing.drugs$fp, is.null))) {
+    dplyr::mutate(fp = purrr::map(parsed.SMILES, ~ get.fingerprint(.x, type = "maccs")))
+
   testing.drugs <- testing.drugs %>%
-    dplyr::mutate(fp = purrr::map(parsed.SMILES, ~ get.fingerprint(.x, type = "extended")))
-}
+    dplyr::mutate(fp = purrr::map(parsed.SMILES, ~ get.fingerprint(.x, type = "maccs")))
 
 # Raw fp frames (your original fp_to_df)
 fp_tr_small_raw <- fp_to_df(training.drugs$fp)
@@ -820,7 +817,7 @@ print(top_schizo)
 ##data split, how u decide on tree, what results (confusion matrix)
 
 # After you fit once, you can prune & refit:
-prune_by_importance <- function(imp_df, keep_n = 30, min_gini = .3) {
+prune_by_importance <- function(imp_df, keep_n = 50, min_gini = .75) {
   imp_df %>%
     tibble::rownames_to_column("feature") %>%
     arrange(desc(MeanDecreaseGini)) %>%
@@ -885,8 +882,52 @@ model.schizo2 = randomForest(
   keep.forest = TRUE
 )
 
+impdep2 <- importance(model.depression2) %>% as.data.frame()
+impdep2<- prune_by_importance(impdep2)
+impdep2
+
+imppark2 <- importance(model.parkinsons2) %>% as.data.frame()
+imppark2<- prune_by_importance(imppark2)
+imppark2
+
+imps2 <- importance(model.schizo2) %>% as.data.frame()
+imps2<- prune_by_importance(imps2)
+imps2
 
 
+# 1) build pruned design matrices (train/test) — same structure as before
+Xd_tr2 <- X_tr_small[, impdep2,  drop = FALSE]
+Xd_te2 <- X_te_small[, impdep2,  drop = FALSE]
+
+Xp_tr2 <- X_tr_small[, imppark2, drop = FALSE]
+Xp_te2 <- X_te_small[, imppark2, drop = FALSE]
+
+Xs_tr2 <- X_tr_small[, imps2,  drop = FALSE]
+Xs_te2 <- X_te_small[, imps2,  drop = FALSE]
+
+model.depression3 = randomForest(
+  x = Xd_tr2, y = as.factor(training.drugs$depression),
+  xtest = Xd_te2, ytest = as.factor(testing.drugs$depression),
+  importance = TRUE,
+  proximity = TRUE,
+  keep.forest = TRUE
+)
+
+model.parkinsons3 = randomForest(
+  x = Xp_tr2, y = as.factor(training.drugs$`Parkinson's Disease`),
+  xtest = Xp_te2, ytest = as.factor(testing.drugs$`Parkinson's Disease`),
+  importance = TRUE,
+  proximity = TRUE,
+  keep.forest = TRUE
+)
+
+model.schizo3 = randomForest(
+  x = Xs_tr2, y = as.factor(training.drugs$schizophrenia),
+  xtest = Xs_te2, ytest = as.factor(testing.drugs$schizophrenia),
+  importance = TRUE,
+  proximity = TRUE,
+  keep.forest = TRUE
+)
 library(caret)
 library(pROC)
 
@@ -984,58 +1025,44 @@ res_scz  <- eval_rf(model.schizo2,      Xs_tr, training.drugs$schizophrenia,    
 model.depression2$importance
 depression2.test = model.depression2$test
 confusionMatrix(depression2.test$predicted, as.factor(testing.drugs$depression), positive = "1")
-
-
 confusionMatrix(model.depression2$predicted, model.depression2$y, positive = "1")
-
-test.object.d2 = model.depression2$test
-votes.d2 = test.object.d2$votes
-
-threshold.d2 = 0.4 # this can help us determine what probability we would say is
-# "good enoough" to say a drug is able to be used for depression, somehow I think
-
-which(votes.d2[,2] > threshold.d2)
-
-testing.drugs[which(votes.d2[,2] > threshold.d2), "indication"]
-testing.drugs[which(testing.drugs$depression == 1), "indication"]
 
 
 model.schizo2$importance
 schizo.test2 = model.schizo2$test
 confusionMatrix(schizo.test2$predicted, as.factor(testing.drugs$schizophrenia), positive = "1")
-
-
-
 confusionMatrix(model.schizo2$predicted, model.schizo2$y, positive = "1")
 
-test.object.s2 = model.schizo2$test
-votes.s2 = test.object.s2$votes
 
-threshold.s2 = 0.4 # this can help us determine what probability we would say is
-# "good enoough" to say a drug is able to be used for depression, somehow I think
-
-which(votes.s2[,2] > threshold.s2)
-
-testing.drugs[which(votes.s2[,2] > threshold.s2), "indication"]
-testing.drugs[which(testing.drugs$schizophrenia== 1), "indication"]
-
-
-
-confusionMatrix(model.parkinsons2$predicted, model.parkinsons2$y, positive = "1")
 
 model.parkinsons2$importance
 parkinsons.test2 = model.parkinsons2$test
 confusionMatrix(parkinsons.test2$predicted, as.factor(testing.drugs$`Parkinson's Disease`), positive = "1")
+confusionMatrix(model.parkinsons2$predicted, model.parkinsons2$y, positive = "1")
 
-test.object.p2 = model.parkinsons2$test
-votes.p2 = test.object.p2$votes
 
-threshold.p2 = 0.4 # this can help us determine what probability we would say is
-# "good enoough" to say a drug is able to be used for depression, somehow I think
 
-which(votes.p2[,2] > threshold.p2)
 
-testing.drugs[which(votes.p2[,2] > threshold.p2), "indication"]
-testing.drugs[which(testing.drugs$`Parkinson's Disease`== 1), "indication"]
+model.depression3$importance
+depression3.test = model.depression3$test
+confusionMatrix(depression3.test$predicted, as.factor(testing.drugs$depression), positive = "1")
+confusionMatrix(model.depression3$predicted, model.depression3$y, positive = "1")
+
+
+model.schizo3$importance
+schizo.test3 = model.schizo3$test
+confusionMatrix(schizo.test3$predicted, as.factor(testing.drugs$schizophrenia), positive = "1")
+confusionMatrix(model.schizo3$predicted, model.schizo3$y, positive = "1")
+
+
+
+model.parkinsons3$importance
+parkinsons.test3 = model.parkinsons3$test
+confusionMatrix(parkinsons.test3$predicted, as.factor(testing.drugs$`Parkinson's Disease`), positive = "1")
+confusionMatrix(model.parkinsons3$predicted, model.parkinsons3$y, positive = "1")
+
+
+
+
 
 
