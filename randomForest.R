@@ -104,10 +104,12 @@ predictors.depression = c(
   # "CHR",
   # "CHR.count",
   # "ADR",
-  "ADR.count",
-  "serotonin.reuptake.inhibitor",
+  # "ADR.count",
+  # "serotonin.reuptake.inhibitor",
+  "serotonin.receptor.agonist",
+  # "serotonin.receptor.antagonist",
   # "norepinephrine.reuptake.inhibitor",
-  "monoamine.oxidase.inhibitor",
+  # "monoamine.oxidase.inhibitor",
   # "T.type.calcium.channel.blocker",
   # "serotonin.receptor.antagonist",
   "xlogp",
@@ -201,8 +203,9 @@ predictors.schizophrenia = c(
   "dopamine.receptor.antagonist",
   "serotonin.receptor.antagonist",
   "xlogp",
-  "tpsa"#,
-  # "num.atoms",
+  "tpsa",
+  "num.atoms",
+  "mass",
   # f.numbers # ,
   # "fp_19",
   # "fp_41",
@@ -220,7 +223,7 @@ predictors.schizophrenia = c(
   # "fp_113",
   # "fp_120",
   # "fp_121",
-  # "fp_128",
+  "fp_128"#,
   # "fp_144",
   # "fp_147",
   # "fp_154",
@@ -262,6 +265,9 @@ predictors.depression[which(predictors.depression == "fp_156")] = "Presence of N
 names(parkinsons.train)[names(parkinsons.train) == "SLC.count"] = "# of SLC Target Proteins"
 names(parkinsons.train)[names(parkinsons.train) == "dopamine.receptor.agonist"] = "Dopamine Receptor Agonist"
 
+names(neuro.psych)[names(neuro.psych) == "SLC.count"] = "# of SLC Target Proteins"
+names(neuro.psych)[names(neuro.psych) == "dopamine.receptor.agonist"] = "Dopamine Receptor Agonist"
+
 predictors.parkinsons[which(predictors.parkinsons == "SLC.count")] = "# of SLC Target Proteins"
 predictors.parkinsons[which(predictors.parkinsons == "dopamine.receptor.agonist")] = "Dopamine Receptor Agonist"
 
@@ -282,7 +288,7 @@ title(main = "Depression Tree")
 # Parkinson's Disease
 parkinsons.tree = rpart(
   formula = as.formula(paste0("Parkinson.s.Disease ~", "`",paste0(predictors.parkinsons, collapse = "`+`"), "`")),
-  data = parkinsons.train[, c("Parkinson.s.Disease", predictors.parkinsons)],
+  data = neuro.psych[, c("Parkinson.s.Disease", predictors.parkinsons)],
   method = "class"
 )
 
