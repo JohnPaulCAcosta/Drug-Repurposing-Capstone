@@ -1,4 +1,6 @@
 library(tidyverse)
+library(pROC)
+library(caret)
 
 ?glm
 
@@ -172,11 +174,26 @@ predictors.schizophrenia = c(
   # "fp_156"
 )
 
+## Model fitting & ROC curves
+
+# Depression
+
 depression.full = glm(
   data = depression.train,
   family = "binomial",
   formula = as.formula(paste0("depression ~", "`",paste0(predictors.depression, collapse = "`+`"), "`"))
 )
+
+train.predictions = predict(
+  object = depression.full,
+  newdata = depression.test
+)
+
+roc.curve = roc(depression.test$depression, train.predictions)
+plot(roc.curve, col = "blue", main = "ROC Curve", 
+     print.auc = TRUE)
+
+summary(depression.full)
 
 depression.sub = glm(
   data = depression.train,
@@ -190,14 +207,34 @@ depression.sub = glm(
   ), collapse = "`+`"), "`"))
 )
 
-summary(depression.full)
+train.predictions = predict(
+  object = depression.sub,
+  newdata = depression.test
+)
+
+roc.curve = roc(depression.test$depression, train.predictions)
+plot(roc.curve, col = "blue", main = "ROC Curve", print.auc = TRUE)
+
 summary(depression.sub)
+
+# Parkinson's Disease
 
 parkinsons.full = glm(
   data = parkinsons.train,
   family = "binomial",
   formula = as.formula(paste0("Parkinson.s.Disease ~", "`",paste0(predictors.parkinsons, collapse = "`+`"), "`"))
 )
+
+train.predictions = predict(
+  object = parkinsons.full,
+  newdata = parkinsons.test
+)
+
+roc.curve = roc(parkinsons.test$depression, train.predictions)
+plot(roc.curve, col = "blue", main = "ROC Curve", 
+     print.auc = TRUE)
+
+summary(parkinsons.full)
 
 parkinsons.sub = glm(
   data = parkinsons.train,
@@ -209,14 +246,33 @@ parkinsons.sub = glm(
   ), collapse = "`+`"), "`"))
 )
 
-summary(parkinsons.full)
+train.predictions = predict(
+  object = parkinsons.sub,
+  newdata = parkinsons.test
+)
+
+roc.curve = roc(parkinsons.test$depression, train.predictions)
+plot(roc.curve, col = "blue", main = "ROC Curve", 
+     print.auc = TRUE)
+
 summary(parkinsons.sub)
+
+# Schizophrenia
 
 schizophrenia.full = glm(
   data = schizophrenia.train,
   family = "binomial",
   formula = as.formula(paste0("schizophrenia ~", "`",paste0(predictors.schizophrenia, collapse = "`+`"), "`"))
 )
+
+train.predictions = predict(
+  object = schizophrenia.full,
+  newdata = schizophrenia.test
+)
+
+roc.curve = roc(schizophrenia.test$depression, train.predictions)
+plot(roc.curve, col = "blue", main = "ROC Curve", 
+     print.auc = TRUE)
 
 # schizophrenia.sub = glm(
 #   data = schizophrenia.train,
