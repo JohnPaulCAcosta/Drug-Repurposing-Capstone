@@ -288,6 +288,8 @@ for (moa in np.moas) {
   
 }
 
+names(all.drugs) = make.names(names(all.drugs))
+
 #### MACCs fingerprints, these are more interpretable I think, looking into what
 # 'extended' meant, there's some hashing and hopefully this way we can still
 # get some performance boosts while actually giving a meaning

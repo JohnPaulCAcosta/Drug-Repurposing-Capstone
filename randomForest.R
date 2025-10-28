@@ -190,12 +190,12 @@ confusionMatrix(parkinsons.model.test$predicted, parkinsons.test$Parkinson.s.Dis
 set.seed(0)
 
 predictors.schizophrenia = c(
-  # "HTR",
+  "HTR",
   "HTR.count",
-  # "HRH",
-  # "HRH.count",
-  # "DRD",
-  # "DRD.count",
+  "HRH",
+  "HRH.count",
+  "DRD",
+  "DRD.count",
   # "CHR",
   # "CHR.count",
   # "ADR",
@@ -223,9 +223,10 @@ predictors.schizophrenia = c(
   # "fp_113",
   # "fp_120",
   # "fp_121",
-  "fp_128"#,
+  # "fp_128",
   # "fp_144",
   # "fp_147",
+  "fp_151"
   # "fp_154",
   # "fp_156"
 )
