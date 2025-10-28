@@ -190,7 +190,7 @@ train.predictions = predict(
 )
 
 roc.curve = roc(depression.test$depression, train.predictions)
-plot(roc.curve, col = "blue", main = "ROC Curve", 
+plot(roc.curve, col = "maroon", main = "ROC Curve", 
      print.auc = TRUE)
 
 summary(depression.full)
@@ -198,7 +198,8 @@ summary(depression.full)
 depression.sub = glm(
   data = depression.train,
   family = "binomial",
-  formula = as.formula(paste0("depression ~", "`",paste0(c( # p-value < .1 in full
+  formula = as.formula(paste0("depression ~", "`",paste0(c(
+    # p-value < .1 in full to get an example of a subset of predictors
     "SLC.count",
     "tpsa",
     "fp_19",
@@ -213,7 +214,7 @@ train.predictions = predict(
 )
 
 roc.curve = roc(depression.test$depression, train.predictions)
-plot(roc.curve, col = "blue", main = "ROC Curve", print.auc = TRUE)
+plot(roc.curve, col = "maroon", main = "ROC Curve", print.auc = TRUE)
 
 summary(depression.sub)
 
@@ -231,7 +232,7 @@ train.predictions = predict(
 )
 
 roc.curve = roc(parkinsons.test$depression, train.predictions)
-plot(roc.curve, col = "blue", main = "ROC Curve", 
+plot(roc.curve, col = "maroon", main = "ROC Curve", 
      print.auc = TRUE)
 
 summary(parkinsons.full)
@@ -239,7 +240,7 @@ summary(parkinsons.full)
 parkinsons.sub = glm(
   data = parkinsons.train,
   family = "binomial",
-  formula = as.formula(paste0("Parkinson.s.Disease ~", "`",paste0(c( # p-value < .1 in full
+  formula = as.formula(paste0("Parkinson.s.Disease ~", "`",paste0(c(
     "dopamine.receptor.agonist",
     "tpsa",
     "num.atoms"
@@ -252,7 +253,7 @@ train.predictions = predict(
 )
 
 roc.curve = roc(parkinsons.test$depression, train.predictions)
-plot(roc.curve, col = "blue", main = "ROC Curve", 
+plot(roc.curve, col = "maroon", main = "ROC Curve", 
      print.auc = TRUE)
 
 summary(parkinsons.sub)
@@ -271,13 +272,13 @@ train.predictions = predict(
 )
 
 roc.curve = roc(schizophrenia.test$depression, train.predictions)
-plot(roc.curve, col = "blue", main = "ROC Curve", 
+plot(roc.curve, col = "maroon", main = "ROC Curve", 
      print.auc = TRUE)
 
 # schizophrenia.sub = glm(
 #   data = schizophrenia.train,
 #   family = "binomial",
-#   formula = as.formula(paste0("schizophrenia ~", "`",paste0(c( # p-value < .1 in full
+#   formula = as.formula(paste0("schizophrenia ~", "`",paste0(c(
 #     "SLC.count",
 #     "tpsa",
 #     "fp_19",
@@ -287,6 +288,4 @@ plot(roc.curve, col = "blue", main = "ROC Curve",
 # )
 
 summary(schizophrenia.full)
-
-# Compare the AICs of the different model/parameter combos we try
 
