@@ -178,7 +178,8 @@ predictors.schizophrenia = c(
 
 # Depression
 
-depression.cutoff = 0.9
+depression.cutoff = 0.9 # Empirically, I found that this was the best for testing,
+# though from 0.5 and beyond the model did well
 
 depression.full = glm(
   data = depression.train,
