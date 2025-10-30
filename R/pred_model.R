@@ -1,6 +1,7 @@
 library(tidyverse)
 library(tidyverse)
 library(broom)
+library(here)
 source(here("R", "clean_data.R"))
 
 # -------------------------------
@@ -374,16 +375,42 @@ library(caret)
 
 #### Train/test splitting
 
+# ---- One split for all tasks, stratified on (dep, park, schizo) ----
+
+#### Train/test splitting — reference-faithful, single split for all 3 labels
 set.seed(1)
 
-n = nrow(neuro_launched)
-random.numbers = sample(1:n) # from 1 to length of the neuro.psych df
+labs <- c("depression", "Parkinson's Disease", "schizophrenia")
 
-train.index = random.numbers[1:floor(n*.70)]
-test.index = random.numbers[(floor(n*.70)+1):n]
+# Build the 8 joint strata: (D,P,S) ∈ {000,100,010,001,110,101,011,111}
+y_combo <- with(neuro_launched, interaction(
+  factor(`depression`,            levels = c(0,1)),
+  factor(`Parkinson's Disease`,   levels = c(0,1)),
+  factor(`schizophrenia`,         levels = c(0,1)),
+  drop = TRUE, lex.order = TRUE
+))
 
-training.drugs = neuro_launched[train.index,]
-testing.drugs = neuro_launched[test.index,]
+# sample ~70% within each joint stratum (mirrors your “70% pos + 70% neg”, but once)
+p <- 0.70
+idx_all <- seq_len(nrow(neuro_launched))
+train.index <- unlist(lapply(split(idx_all, y_combo), function(ii) {
+  k <- floor(length(ii) * p + 0.5)  # stochastic-ish rounding toward 70%
+  if (k <= 0) integer(0) else sample(ii, k)
+}))
+train.index <- sort(unique(train.index))
+test.index  <- setdiff(idx_all, train.index)
+
+training.drugs <- neuro_launched[train.index, , drop = FALSE]
+testing.drugs  <- neuro_launched[test.index,  , drop = FALSE]
+
+# --- quick check: should be very close to 70/30 for each label ---
+check_prop <- function(df, col) prop.table(table(df[[col]]))["1"]
+cat("Train/Test positive rates:\n")
+for (lbl in labs) {
+  pt <- as.numeric(check_prop(training.drugs, lbl))
+  pe <- as.numeric(check_prop(testing.drugs,  lbl))
+  cat(sprintf("  %-20s  train=%.4f  test=%.4f\n", lbl, ifelse(is.na(pt),0,pt), ifelse(is.na(pe),0,pe)))
+}
 
 # See if there's a good spread of depression drugs
 
@@ -450,7 +477,7 @@ targ_col_count <-paste0(targ_cols, ".count")
 core_feats <- intersect(c("xlogp", "tpsa", "num.atoms", "mass"), names(training.drugs))
 
 # Final predictor list present in both train & test
-predictors <- unique(c(core_feats, targ_cols, moa_cols,targ_col_count))
+predictors <- unique(c(core_feats, moa_cols,targ_col_count))
 # add to your predictors list (whatever you already had)
 predictors <- unique(c(predictors, chosen_fp))
 predictors <- predictors[predictors %in% intersect(names(training.drugs), names(testing.drugs))]
@@ -481,7 +508,13 @@ fp_cols  <- colnames(fp_train)         # <- save these
 
 
 # example manual picks (edit these)
-#chosen_fp <- c("fp_12", "fp_57", "fp_384", "fp_777", "fp_1012")
+chosen_fp <- c("fp_19", "fp_58","fp_57","fp_151","fp_164","fp_150","fp_157","fp_19","fp_120", "fp_159",
+"fp_82", # presence of a methylene group bridging together a two heavy atoms, one of which is bonded to hydrogen
+"fp_104", # presence of two heavys atom bonded to hydrogen connected by methylene and a heavy atom 
+"fp_144", # presence of three non-aromatic atoms chained together
+"fp_154", # presence of a carbonyl group
+"fp_156", "fp_17", "fp_91","fp_96","fp_155", "fp_133",
+"fp_41", "fp_57", "fp_66","fp_74","fp_75","fp_93")
 
 # guard against typos
 #chosen_fp <- intersect(chosen_fp, fp_cols)
@@ -489,12 +522,11 @@ fp_ref_cols <- grep("^fp_", colnames(X_train_full), value = TRUE)
 
 # Pick a few FP bits from big-model importance
 # (edit head(...) or supply your own vector)
-chosen_fp <- rf_imp_top$feature[grepl("^fp_", rf_imp_top$feature)]
+#chosen_fp <- rf_imp_top$feature[grepl("^fp_", rf_imp_top$feature)]
 chosen_fp <- intersect(chosen_fp, fp_ref_cols)
-chosen_fp <- head(chosen_fp, 10)   # keep 4–5
+chosen_fp <- head(chosen_fp, 30)   # keep 4–5
 chosen_fp
-chosen_fp2<- fp_cols
-chosen_fp
+
 # Non-fingerprint predictors you already use
 nonfp_preds <- setdiff(predictors, fp_ref_cols)
 
@@ -665,6 +697,339 @@ testing.drugs[which(testing.drugs$`Parkinson's Disease`== 1), "indication"]
 
 
 
+#####refit 
+# After you fit once, you can prune & refit:
+prune_by_importance <- function(imp_df, keep_n = 50, min_gini = .75) {
+  imp_df %>%
+    tibble::rownames_to_column("feature") %>%
+    arrange(desc(MeanDecreaseGini)) %>%
+    filter(MeanDecreaseGini >= min_gini) %>%
+    slice_head(n = keep_n) %>%
+    pull(feature)
+}
+impdep <- importance(model.depression) %>% as.data.frame()
+impdep<- prune_by_importance(impdep)
+impdep
+
+imppark <- importance(model.parkinsons) %>% as.data.frame()
+imppark<- prune_by_importance(imppark)
+imppark
+
+imps <- importance(model.schizo) %>% as.data.frame()
+imps<- prune_by_importance(imps)
+imps
+
+# ===== Refit the three small RFs using pruned variables =====
+
+# 0) safety: intersect pruned lists with available columns
+keep_dep  <- intersect(colnames(X_tr_small), impdep)
+keep_park <- intersect(colnames(X_tr_small), imppark)
+keep_scz  <- intersect(colnames(X_tr_small), imps)
+
+# 1) build pruned design matrices (train/test) — same structure as before
+Xd_tr <- X_tr_small[, keep_dep,  drop = FALSE]
+Xd_te <- X_te_small[, keep_dep,  drop = FALSE]
+
+Xp_tr <- X_tr_small[, keep_park, drop = FALSE]
+Xp_te <- X_te_small[, keep_park, drop = FALSE]
+
+Xs_tr <- X_tr_small[, keep_scz,  drop = FALSE]
+Xs_te <- X_te_small[, keep_scz,  drop = FALSE]
+
+
+
+# 3) REFIT (same objects, same structure, just with pruned X_* matrices)
+set.seed(1)
+model.depression2 = randomForest(
+  x = Xd_tr, y = as.factor(training.drugs$depression),
+  xtest = Xd_te, ytest = as.factor(testing.drugs$depression),
+  importance = TRUE,
+  proximity = TRUE,
+  keep.forest = TRUE
+)
+
+model.parkinsons2 = randomForest(
+  x = Xp_tr, y = as.factor(training.drugs$`Parkinson's Disease`),
+  xtest = Xp_te, ytest = as.factor(testing.drugs$`Parkinson's Disease`),
+  importance = TRUE,
+  proximity = TRUE,
+  keep.forest = TRUE
+)
+
+model.schizo2 = randomForest(
+  x = Xs_tr, y = as.factor(training.drugs$schizophrenia),
+  xtest = Xs_te, ytest = as.factor(testing.drugs$schizophrenia),
+  importance = TRUE,
+  proximity = TRUE,
+  keep.forest = TRUE
+)
+
+
+model.depression2$importance
+depression2.test = model.depression2$test
+confusionMatrix(depression2.test$predicted, as.factor(testing.drugs$depression), positive = "1")
+confusionMatrix(model.depression2$predicted, model.depression2$y, positive = "1")
+
+
+model.schizo2$importance
+schizo.test2 = model.schizo2$test
+confusionMatrix(schizo.test2$predicted, as.factor(testing.drugs$schizophrenia), positive = "1")
+confusionMatrix(model.schizo2$predicted, model.schizo2$y, positive = "1")
+
+
+
+model.parkinsons2$importance
+parkinsons.test2 = model.parkinsons2$test
+confusionMatrix(parkinsons.test2$predicted, as.factor(testing.drugs$`Parkinson's Disease`), positive = "1")
+confusionMatrix(model.parkinsons2$predicted, model.parkinsons2$y, positive = "1")
+
+
+impdep2 <- importance(model.depression2) %>% as.data.frame()
+impdep2<- prune_by_importance(impdep2, min_gini = 1)
+impdep2
+
+imppark2 <- importance(model.parkinsons2) %>% as.data.frame()
+imppark2<- prune_by_importance(imppark2, min_gini = 1)
+imppark2
+
+imps2 <- importance(model.schizo2) %>% as.data.frame()
+imps2<- prune_by_importance(imps2, min_gini = 1)
+imps2
+
+
+# 1) build pruned design matrices (train/test) — same structure as before
+Xd_tr2 <- X_tr_small[, impdep2,  drop = FALSE]
+Xd_te2 <- X_te_small[, impdep2,  drop = FALSE]
+
+Xp_tr2 <- X_tr_small[, imppark2, drop = FALSE]
+Xp_te2 <- X_te_small[, imppark2, drop = FALSE]
+
+Xs_tr2 <- X_tr_small[, imps2,  drop = FALSE]
+Xs_te2 <- X_te_small[, imps2,  drop = FALSE]
+
+model.depression3 = randomForest(
+  x = Xd_tr2, y = as.factor(training.drugs$depression),
+  xtest = Xd_te2, ytest = as.factor(testing.drugs$depression),
+  importance = TRUE,
+  proximity = TRUE,
+  keep.forest = TRUE
+)
+
+model.parkinsons3 = randomForest(
+  x = Xp_tr2, y = as.factor(training.drugs$`Parkinson's Disease`),
+  xtest = Xp_te2, ytest = as.factor(testing.drugs$`Parkinson's Disease`),
+  importance = TRUE,
+  proximity = TRUE,
+  keep.forest = TRUE
+)
+
+model.schizo3 = randomForest(
+  x = Xs_tr2, y = as.factor(training.drugs$schizophrenia),
+  xtest = Xs_te2, ytest = as.factor(testing.drugs$schizophrenia),
+  importance = TRUE,
+  proximity = TRUE,
+  keep.forest = TRUE
+)
+
+
+
+
+model.depression3$importance
+depression3.test = model.depression3$test
+confusionMatrix(depression3.test$predicted, as.factor(testing.drugs$depression), positive = "1")
+confusionMatrix(model.depression3$predicted, model.depression3$y, positive = "1")
+
+
+model.schizo3$importance
+schizo.test3 = model.schizo3$test
+confusionMatrix(schizo.test3$predicted, as.factor(testing.drugs$schizophrenia), positive = "1")
+confusionMatrix(model.schizo3$predicted, model.schizo3$y, positive = "1")
+
+
+
+model.parkinsons3$importance
+parkinsons.test3 = model.parkinsons3$test
+confusionMatrix(parkinsons.test3$predicted, as.factor(testing.drugs$`Parkinson's Disease`), positive = "1")
+confusionMatrix(model.parkinsons3$predicted, model.parkinsons3$y, positive = "1")
+
+
+library(pROC)
+library(caret)
+pred_dep <- c("SLC.count", "tpsa", "monoamine oxidase inhibitor",
+                   "HTR.count", "adrenergic receptor antagonist", "fp_151")
+
+form_dep <- as.formula(
+  paste("y ~", paste(sprintf("`%s`", impdep2), collapse = " + "))
+)
+# ---- DEPRESSION ----
+dtr_dep <- dplyr::bind_cols(X_tr_small, y = as.integer(training.drugs$depression == 1))
+fit_dep <- glm(form_dep, data = dtr_dep, family = binomial())
+p_dep <- predict(fit_dep, newdata = X_te_small, type = "response")
+
+roc_dep <- pROC::roc(as.integer(testing.drugs$depression == 1), p_dep)
+plot(roc_dep, main = sprintf("Depression GLM (AUC = %.3f)", as.numeric(pROC::auc(roc_dep))), col = "maroon")
+pred_dep <- factor(ifelse(p_dep >= 0.5, 1, 0), levels = c(0,1))
+truth_dep <- factor(as.integer(testing.drugs$depression == 1), levels = c(0,1))
+confusionMatrix(pred_dep, truth_dep, positive = "1")
+summary(fit_dep)
+
+form_schiz <- as.formula(
+  paste("y ~", paste(sprintf("`%s`", imps2), collapse = " + "))
+)
+# ---- DEPRESSION ----
+dtr_schiz <- dplyr::bind_cols(X_tr_small, y = as.integer(training.drugs$schizophrenia == 1))
+fit_schiz <- glm(form_schiz, data = dtr_schiz, family = binomial())
+p_schiz <- predict(fit_schiz, newdata = X_te_small, type = "response")
+
+roc_schiz <- pROC::roc(as.integer(testing.drugs$schizophrenia == 1), p_schiz)
+plot(roc_schiz, main = sprintf("schiz GLM (AUC = %.3f)", as.numeric(pROC::auc(roc_schiz))), col = "maroon")
+pred_schiz <- factor(ifelse(p_schiz >= 0.5, 1, 0), levels = c(0,1))
+truth_schiz <- factor(as.integer(testing.drugs$schizophrenia == 1), levels = c(0,1))
+confusionMatrix(pred_schiz, truth_schiz, positive = "1")
+summary(fit_schiz)
+
+# 
+# Confusion Matrix and Statistics
+# 
+# Reference
+# Prediction   0   1
+# 0 100   4
+# 1   1  11
+# 
+# Accuracy : 0.9569          
+# 95% CI : (0.9023, 0.9859)
+# No Information Rate : 0.8707          
+# P-Value [Acc > NIR] : 0.001699        
+# 
+# Kappa : 0.7908          
+# 
+# Mcnemar's Test P-Value : 0.371093        
+#                                           
+#             Sensitivity : 0.73333         
+#             Specificity : 0.99010         
+#          Pos Pred Value : 0.91667         
+#          Neg Pred Value : 0.96154         
+#              Prevalence : 0.12931         
+#          Detection Rate : 0.09483         
+#    Detection Prevalence : 0.10345         
+#       Balanced Accuracy : 0.86172         
+#                                           
+#        'Positive' Class : 1          
+
+library(caret)
+library(pROC)
+
+# # helper: pick Youden J threshold (guard for degenerate probs)
+# best_thr <- function(y, p) {
+#   if (length(unique(p)) < 2) return(0.5)
+#   r <- roc(y, p, quiet = TRUE)
+#   as.numeric(coords(r, x = "best", best.method = "youden", ret = "threshold"))
+# }
+# 
+# eval_rf <- function(model, Xtr, ytr, Xte, yte, label = "") {
+#   ytr <- factor(ytr, levels = c(0,1))
+#   yte <- factor(yte, levels = c(0,1))
+#   
+#   # ---- probabilities
+#   p_tr <- predict(model, newdata = Xtr, type = "prob")[, "1"]
+#   p_te <- predict(model, newdata = Xte, type = "prob")[, "1"]
+#   
+#   # ---- AUCs
+#   auc_tr <- if (length(unique(p_tr)) > 1) as.numeric(auc(ytr, p_tr)) else NA_real_
+#   auc_te <- if (length(unique(p_te)) > 1) as.numeric(auc(yte, p_te)) else NA_real_
+#   
+#   # ---- thresholds
+#   thr_te <- best_thr(yte, p_te)   # choose on TEST (you can swap to validation if you prefer)
+#   thr50  <- 0.5
+#   
+#   # ---- predictions @ thresholds
+#   pred_tr_50 <- factor(as.integer(p_tr >= thr50), levels = c(0,1))
+#   pred_te_50 <- factor(as.integer(p_te >= thr50), levels = c(0,1))
+#   
+#   pred_tr_bt <- factor(as.integer(p_tr >= thr_te), levels = c(0,1))
+#   pred_te_bt <- factor(as.integer(p_te >= thr_te), levels = c(0,1))
+#   
+#   # ---- confusion matrices
+#   cm_tr_50 <- confusionMatrix(pred_tr_50, ytr, positive = "1")
+#   cm_te_50 <- confusionMatrix(pred_te_50, yte, positive = "1")
+#   
+#   cm_tr_bt <- confusionMatrix(pred_tr_bt, ytr, positive = "1")
+#   cm_te_bt <- confusionMatrix(pred_te_bt, yte, positive = "1")
+#   
+#   # ---- OOB (last row of err.rate)
+#   oob <- tryCatch({
+#     er <- model$err.rate
+#     if (is.null(er)) NA_real_ else er[nrow(er), "OOB"]
+#   }, error = function(e) NA_real_)
+#   
+#   cat("\n==============================\n")
+#   cat(sprintf("Model: %s\n", label))
+#   cat("------------------------------\n")
+#   cat(sprintf("OOB error (rf): %s\n", ifelse(is.na(oob), "NA", sprintf("%.3f", oob))))
+#   cat(sprintf("AUC  Train: %s | Test: %s\n",
+#               ifelse(is.na(auc_tr), "NA", sprintf("%.3f", auc_tr)),
+#               ifelse(is.na(auc_te), "NA", sprintf("%.3f", auc_te))))
+#   cat(sprintf("Test-derived best threshold (Youden J): %.3f\n\n", thr_te))
+#   
+#   cat("--- Confusion Matrix @ 0.5 (TRAIN) ---\n"); print(cm_tr_50$table)
+#   cat(sprintf("Accuracy: %.3f  Sens: %.3f  Spec: %.3f\n\n",
+#               cm_tr_50$overall["Accuracy"],
+#               cm_tr_50$byClass["Sensitivity"],
+#               cm_tr_50$byClass["Specificity"]))
+#   
+#   cat("--- Confusion Matrix @ 0.5 (TEST) ---\n"); print(cm_te_50$table)
+#   cat(sprintf("Accuracy: %.3f  Sens: %.3f  Spec: %.3f\n\n",
+#               cm_te_50$overall["Accuracy"],
+#               cm_te_50$byClass["Sensitivity"],
+#               cm_te_50$byClass["Specificity"]))
+#   
+#   cat("--- Confusion Matrix @ BestThr (TRAIN) ---\n"); print(cm_tr_bt$table)
+#   cat(sprintf("Accuracy: %.3f  Sens: %.3f  Spec: %.3f\n\n",
+#               cm_tr_bt$overall["Accuracy"],
+#               cm_tr_bt$byClass["Sensitivity"],
+#               cm_tr_bt$byClass["Specificity"]))
+#   
+#   cat("--- Confusion Matrix @ BestThr (TEST) ---\n"); print(cm_te_bt$table)
+#   cat(sprintf("Accuracy: %.3f  Sens: %.3f  Spec: %.3f\n",
+#               cm_te_bt$overall["Accuracy"],
+#               cm_te_bt$byClass["Sensitivity"],
+#               cm_te_bt$byClass["Specificity"]))
+#   
+#   invisible(list(
+#     auc_train = auc_tr, auc_test = auc_te,
+#     thr_test = thr_te,
+#     cm_train_05 = cm_tr_50, cm_test_05 = cm_te_50,
+#     cm_train_bt = cm_tr_bt, cm_test_bt = cm_te_bt
+#   ))
+# }
+# 
+# # ==== run evals on your three NEW models ====
+# res_dep  <- eval_rf(model.depression2,  Xd_tr, training.drugs$depression,            Xd_te, testing.drugs$depression,            label = "Depression")
+# res_park <- eval_rf(model.parkinsons2,  Xp_tr, training.drugs$`Parkinson's Disease`,  Xp_te, testing.drugs$`Parkinson's Disease`,  label = "Parkinson's")
+# res_scz  <- eval_rf(model.schizo2,      Xs_tr, training.drugs$schizophrenia,          Xs_te, testing.drugs$schizophrenia,          label = "Schizophrenia")
+
+
+
+
+
+
+
+colnames(X_tr_small) <- make.names(colnames(X_tr_small))
+schizophrenia.tree2 <- rpart(
+  schizophrenia ~ .,
+  data = cbind(schizophrenia = factor(training.drugs$schizophrenia, levels = c(0,1)),
+               X_tr_small),
+  method = "class"
+)
+
+
+rpart.plot(schizophrenia.tree2)
+title(main = "Schizophrenia Tre2e")
+
+
+
+
+
 # -------------------------------
 # Predict on preclinical (non-launched) drugs
 # -------------------------------
@@ -813,268 +1178,6 @@ print(top_parkinsons)
 
 cat("\n--- Top 10 Predicted Schizophrenia-like Compounds ---\n")
 print(top_schizo)
-
-##data split, how u decide on tree, what results (confusion matrix)
-
-# After you fit once, you can prune & refit:
-prune_by_importance <- function(imp_df, keep_n = 50, min_gini = .75) {
-  imp_df %>%
-    tibble::rownames_to_column("feature") %>%
-    arrange(desc(MeanDecreaseGini)) %>%
-    filter(MeanDecreaseGini >= min_gini) %>%
-    slice_head(n = keep_n) %>%
-    pull(feature)
-}
-impdep <- importance(model.depression) %>% as.data.frame()
-impdep<- prune_by_importance(impdep)
-impdep
-
-imppark <- importance(model.parkinsons) %>% as.data.frame()
-imppark<- prune_by_importance(imppark)
-imppark
-
-imps <- importance(model.schizo) %>% as.data.frame()
-imps<- prune_by_importance(imps)
-imps
-
-# ===== Refit the three small RFs using pruned variables =====
-
-# 0) safety: intersect pruned lists with available columns
-keep_dep  <- intersect(colnames(X_tr_small), impdep)
-keep_park <- intersect(colnames(X_tr_small), imppark)
-keep_scz  <- intersect(colnames(X_tr_small), imps)
-
-# 1) build pruned design matrices (train/test) — same structure as before
-Xd_tr <- X_tr_small[, keep_dep,  drop = FALSE]
-Xd_te <- X_te_small[, keep_dep,  drop = FALSE]
-
-Xp_tr <- X_tr_small[, keep_park, drop = FALSE]
-Xp_te <- X_te_small[, keep_park, drop = FALSE]
-
-Xs_tr <- X_tr_small[, keep_scz,  drop = FALSE]
-Xs_te <- X_te_small[, keep_scz,  drop = FALSE]
-
-
-
-# 3) REFIT (same objects, same structure, just with pruned X_* matrices)
-set.seed(1)
-model.depression2 = randomForest(
-  x = Xd_tr, y = as.factor(training.drugs$depression),
-  xtest = Xd_te, ytest = as.factor(testing.drugs$depression),
-  importance = TRUE,
-  proximity = TRUE,
-  keep.forest = TRUE
-)
-
-model.parkinsons2 = randomForest(
-  x = Xp_tr, y = as.factor(training.drugs$`Parkinson's Disease`),
-  xtest = Xp_te, ytest = as.factor(testing.drugs$`Parkinson's Disease`),
-  importance = TRUE,
-  proximity = TRUE,
-  keep.forest = TRUE
-)
-
-model.schizo2 = randomForest(
-  x = Xs_tr, y = as.factor(training.drugs$schizophrenia),
-  xtest = Xs_te, ytest = as.factor(testing.drugs$schizophrenia),
-  importance = TRUE,
-  proximity = TRUE,
-  keep.forest = TRUE
-)
-
-impdep2 <- importance(model.depression2) %>% as.data.frame()
-impdep2<- prune_by_importance(impdep2)
-impdep2
-
-imppark2 <- importance(model.parkinsons2) %>% as.data.frame()
-imppark2<- prune_by_importance(imppark2)
-imppark2
-
-imps2 <- importance(model.schizo2) %>% as.data.frame()
-imps2<- prune_by_importance(imps2)
-imps2
-
-
-# 1) build pruned design matrices (train/test) — same structure as before
-Xd_tr2 <- X_tr_small[, impdep2,  drop = FALSE]
-Xd_te2 <- X_te_small[, impdep2,  drop = FALSE]
-
-Xp_tr2 <- X_tr_small[, imppark2, drop = FALSE]
-Xp_te2 <- X_te_small[, imppark2, drop = FALSE]
-
-Xs_tr2 <- X_tr_small[, imps2,  drop = FALSE]
-Xs_te2 <- X_te_small[, imps2,  drop = FALSE]
-
-model.depression3 = randomForest(
-  x = Xd_tr2, y = as.factor(training.drugs$depression),
-  xtest = Xd_te2, ytest = as.factor(testing.drugs$depression),
-  importance = TRUE,
-  proximity = TRUE,
-  keep.forest = TRUE
-)
-
-model.parkinsons3 = randomForest(
-  x = Xp_tr2, y = as.factor(training.drugs$`Parkinson's Disease`),
-  xtest = Xp_te2, ytest = as.factor(testing.drugs$`Parkinson's Disease`),
-  importance = TRUE,
-  proximity = TRUE,
-  keep.forest = TRUE
-)
-
-model.schizo3 = randomForest(
-  x = Xs_tr2, y = as.factor(training.drugs$schizophrenia),
-  xtest = Xs_te2, ytest = as.factor(testing.drugs$schizophrenia),
-  importance = TRUE,
-  proximity = TRUE,
-  keep.forest = TRUE
-)
-library(caret)
-library(pROC)
-
-# helper: pick Youden J threshold (guard for degenerate probs)
-best_thr <- function(y, p) {
-  if (length(unique(p)) < 2) return(0.5)
-  r <- roc(y, p, quiet = TRUE)
-  as.numeric(coords(r, x = "best", best.method = "youden", ret = "threshold"))
-}
-
-eval_rf <- function(model, Xtr, ytr, Xte, yte, label = "") {
-  ytr <- factor(ytr, levels = c(0,1))
-  yte <- factor(yte, levels = c(0,1))
-  
-  # ---- probabilities
-  p_tr <- predict(model, newdata = Xtr, type = "prob")[, "1"]
-  p_te <- predict(model, newdata = Xte, type = "prob")[, "1"]
-  
-  # ---- AUCs
-  auc_tr <- if (length(unique(p_tr)) > 1) as.numeric(auc(ytr, p_tr)) else NA_real_
-  auc_te <- if (length(unique(p_te)) > 1) as.numeric(auc(yte, p_te)) else NA_real_
-  
-  # ---- thresholds
-  thr_te <- best_thr(yte, p_te)   # choose on TEST (you can swap to validation if you prefer)
-  thr50  <- 0.5
-  
-  # ---- predictions @ thresholds
-  pred_tr_50 <- factor(as.integer(p_tr >= thr50), levels = c(0,1))
-  pred_te_50 <- factor(as.integer(p_te >= thr50), levels = c(0,1))
-  
-  pred_tr_bt <- factor(as.integer(p_tr >= thr_te), levels = c(0,1))
-  pred_te_bt <- factor(as.integer(p_te >= thr_te), levels = c(0,1))
-  
-  # ---- confusion matrices
-  cm_tr_50 <- confusionMatrix(pred_tr_50, ytr, positive = "1")
-  cm_te_50 <- confusionMatrix(pred_te_50, yte, positive = "1")
-  
-  cm_tr_bt <- confusionMatrix(pred_tr_bt, ytr, positive = "1")
-  cm_te_bt <- confusionMatrix(pred_te_bt, yte, positive = "1")
-  
-  # ---- OOB (last row of err.rate)
-  oob <- tryCatch({
-    er <- model$err.rate
-    if (is.null(er)) NA_real_ else er[nrow(er), "OOB"]
-  }, error = function(e) NA_real_)
-  
-  cat("\n==============================\n")
-  cat(sprintf("Model: %s\n", label))
-  cat("------------------------------\n")
-  cat(sprintf("OOB error (rf): %s\n", ifelse(is.na(oob), "NA", sprintf("%.3f", oob))))
-  cat(sprintf("AUC  Train: %s | Test: %s\n",
-              ifelse(is.na(auc_tr), "NA", sprintf("%.3f", auc_tr)),
-              ifelse(is.na(auc_te), "NA", sprintf("%.3f", auc_te))))
-  cat(sprintf("Test-derived best threshold (Youden J): %.3f\n\n", thr_te))
-  
-  cat("--- Confusion Matrix @ 0.5 (TRAIN) ---\n"); print(cm_tr_50$table)
-  cat(sprintf("Accuracy: %.3f  Sens: %.3f  Spec: %.3f\n\n",
-              cm_tr_50$overall["Accuracy"],
-              cm_tr_50$byClass["Sensitivity"],
-              cm_tr_50$byClass["Specificity"]))
-  
-  cat("--- Confusion Matrix @ 0.5 (TEST) ---\n"); print(cm_te_50$table)
-  cat(sprintf("Accuracy: %.3f  Sens: %.3f  Spec: %.3f\n\n",
-              cm_te_50$overall["Accuracy"],
-              cm_te_50$byClass["Sensitivity"],
-              cm_te_50$byClass["Specificity"]))
-  
-  cat("--- Confusion Matrix @ BestThr (TRAIN) ---\n"); print(cm_tr_bt$table)
-  cat(sprintf("Accuracy: %.3f  Sens: %.3f  Spec: %.3f\n\n",
-              cm_tr_bt$overall["Accuracy"],
-              cm_tr_bt$byClass["Sensitivity"],
-              cm_tr_bt$byClass["Specificity"]))
-  
-  cat("--- Confusion Matrix @ BestThr (TEST) ---\n"); print(cm_te_bt$table)
-  cat(sprintf("Accuracy: %.3f  Sens: %.3f  Spec: %.3f\n",
-              cm_te_bt$overall["Accuracy"],
-              cm_te_bt$byClass["Sensitivity"],
-              cm_te_bt$byClass["Specificity"]))
-  
-  invisible(list(
-    auc_train = auc_tr, auc_test = auc_te,
-    thr_test = thr_te,
-    cm_train_05 = cm_tr_50, cm_test_05 = cm_te_50,
-    cm_train_bt = cm_tr_bt, cm_test_bt = cm_te_bt
-  ))
-}
-
-# ==== run evals on your three NEW models ====
-res_dep  <- eval_rf(model.depression2,  Xd_tr, training.drugs$depression,            Xd_te, testing.drugs$depression,            label = "Depression")
-res_park <- eval_rf(model.parkinsons2,  Xp_tr, training.drugs$`Parkinson's Disease`,  Xp_te, testing.drugs$`Parkinson's Disease`,  label = "Parkinson's")
-res_scz  <- eval_rf(model.schizo2,      Xs_tr, training.drugs$schizophrenia,          Xs_te, testing.drugs$schizophrenia,          label = "Schizophrenia")
-
-
-
-model.depression2$importance
-depression2.test = model.depression2$test
-confusionMatrix(depression2.test$predicted, as.factor(testing.drugs$depression), positive = "1")
-confusionMatrix(model.depression2$predicted, model.depression2$y, positive = "1")
-
-
-model.schizo2$importance
-schizo.test2 = model.schizo2$test
-confusionMatrix(schizo.test2$predicted, as.factor(testing.drugs$schizophrenia), positive = "1")
-confusionMatrix(model.schizo2$predicted, model.schizo2$y, positive = "1")
-
-
-
-model.parkinsons2$importance
-parkinsons.test2 = model.parkinsons2$test
-confusionMatrix(parkinsons.test2$predicted, as.factor(testing.drugs$`Parkinson's Disease`), positive = "1")
-confusionMatrix(model.parkinsons2$predicted, model.parkinsons2$y, positive = "1")
-
-colnames(X_tr_small) <- make.names(colnames(X_tr_small))
-schizophrenia.tree2 <- rpart(
-  schizophrenia ~ .,
-  data = cbind(schizophrenia = factor(training.drugs$schizophrenia, levels = c(0,1)),
-               X_tr_small),
-  method = "class"
-)
-
-
-rpart.plot(schizophrenia.tree2)
-title(main = "Schizophrenia Tre2e")
-
-
-
-
-model.depression3$importance
-depression3.test = model.depression3$test
-confusionMatrix(depression3.test$predicted, as.factor(testing.drugs$depression), positive = "1")
-confusionMatrix(model.depression3$predicted, model.depression3$y, positive = "1")
-
-
-model.schizo3$importance
-schizo.test3 = model.schizo3$test
-confusionMatrix(schizo.test3$predicted, as.factor(testing.drugs$schizophrenia), positive = "1")
-confusionMatrix(model.schizo3$predicted, model.schizo3$y, positive = "1")
-
-
-
-model.parkinsons3$importance
-parkinsons.test3 = model.parkinsons3$test
-confusionMatrix(parkinsons.test3$predicted, as.factor(testing.drugs$`Parkinson's Disease`), positive = "1")
-confusionMatrix(model.parkinsons3$predicted, model.parkinsons3$y, positive = "1")
-
-
-
 
 
 
