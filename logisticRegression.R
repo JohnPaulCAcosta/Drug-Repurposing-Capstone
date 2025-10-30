@@ -216,6 +216,8 @@ train.predictions = predict(
 roc.curve = roc(depression.test$depression, train.predictions)
 plot(roc.curve, col = "maroon", main = "ROC Curve", print.auc = TRUE)
 
+confusionMatrix(as.factor(as.numeric(train.predictions > 0.5)), depression.test$depression, positive = "1")
+
 summary(depression.sub)
 
 # Parkinson's Disease
