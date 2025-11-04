@@ -193,10 +193,6 @@ test.predictions = predict(
   type = "response"
 )
 
-roc.curve = roc(depression.test$depression, test.predictions)
-plot(roc.curve, col = "maroon", main = "ROC Curve", 
-     print.auc = TRUE)
-
 # Training Confusion Matrix
 confusionMatrix(as.factor(as.numeric(depression.full$fitted.values > depression.cutoff)), depression.train$depression, positive = "1")
 # Testing Confusion Matrix
@@ -207,58 +203,42 @@ summary(depression.full)
 # Subset predictors for which p-value < .1 in fuller model to get an example
 # of a subset of predictors
 
-depression.sub = glm(
-  data = depression.train,
-  family = "binomial",
-  formula = as.formula(paste0("depression ~", "`",paste0(c(
-    "SLC.count",
-    "tpsa",
-    "fp_19",
-    "fp_82",
-    "fp_104"
-  ), collapse = "`+`"), "`"))
-)
-
-test.predictions = predict(
-  object = depression.sub,
-  newdata = depression.test,
-  type = "response"
-)
-
-roc.curve = roc(depression.test$depression, test.predictions)
-plot(roc.curve, col = "maroon", main = "ROC Curve", print.auc = TRUE)
-
-# Training Confusion Matrix
-confusionMatrix(as.factor(as.numeric(depression.sub$fitted.values > depression.cutoff)), depression.train$depression, positive = "1")
-# Testing Confusion Matrix
-confusionMatrix(as.factor(as.numeric(test.predictions > depression.cutoff)), depression.test$depression, positive = "1")
-
-summary(depression.sub)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+# depression.sub = glm(
+#   data = depression.train,
+#   family = "binomial",
+#   formula = as.formula(paste0("depression ~", "`",paste0(c(
+#     "SLC.count",
+#     "tpsa",
+#     "fp_19",
+#     "fp_82",
+#     "fp_104"
+#   ), collapse = "`+`"), "`"))
+# )
+# 
+# test.predictions = predict(
+#   object = depression.sub,
+#   newdata = depression.test,
+#   type = "response"
+# )
+# 
+# roc.curve = roc(depression.test$depression, test.predictions)
+# plot(roc.curve, col = "maroon", main = "ROC Curve", print.auc = TRUE)
+# 
+# # Training Confusion Matrix
+# confusionMatrix(as.factor(as.numeric(depression.sub$fitted.values > depression.cutoff)), depression.train$depression, positive = "1")
+# # Testing Confusion Matrix
+# confusionMatrix(as.factor(as.numeric(test.predictions > depression.cutoff)), depression.test$depression, positive = "1")
+# 
+# summary(depression.sub)
+# 
+# roc.curve = roc(depression.test$depression, test.predictions)
+# plot(roc.curve, col = "maroon", main = "ROC Curve", 
+#      print.auc = TRUE)
 
 
 # Parkinson's Disease
+
+parkinsons.cutoff = 0.5
 
 parkinsons.full = glm(
   data = parkinsons.train,
@@ -266,7 +246,7 @@ parkinsons.full = glm(
   formula = as.formula(paste0("Parkinson.s.Disease ~", "`",paste0(predictors.parkinsons, collapse = "`+`"), "`"))
 )
 
-test.predictions = predict(
+test.predictionstest.predictionstest.predictions = predict(
   object = parkinsons.full,
   newdata = parkinsons.test
 )
@@ -275,30 +255,42 @@ roc.curve = roc(parkinsons.test$depression, test.predictions)
 plot(roc.curve, col = "maroon", main = "ROC Curve", 
      print.auc = TRUE)
 
+# Training Confusion Matrix
+confusionMatrix(as.factor(as.numeric(parkinsons.full$fitted.values > parkinsons.cutoff)), parkinsons.train$Parkinson.s.Disease, positive = "1")
+# Testing Confusion Matrix
+confusionMatrix(as.factor(as.numeric(test.predictions > parkinsons.cutoff)), parkinsons.test$Parkinson.s.Disease, positive = "1")
+
 summary(parkinsons.full)
 
-parkinsons.sub = glm(
-  data = parkinsons.train,
-  family = "binomial",
-  formula = as.formula(paste0("Parkinson.s.Disease ~", "`",paste0(c(
-    "dopamine.receptor.agonist",
-    "tpsa",
-    "num.atoms"
-  ), collapse = "`+`"), "`"))
-)
-
-test.predictions = predict(
-  object = parkinsons.sub,
-  newdata = parkinsons.test
-)
-
-roc.curve = roc(parkinsons.test$depression, test.predictions)
-plot(roc.curve, col = "maroon", main = "ROC Curve", 
-     print.auc = TRUE)
-
-summary(parkinsons.sub)
+# parkinsons.sub = glm(
+#   data = parkinsons.train,
+#   family = "binomial",
+#   formula = as.formula(paste0("Parkinson.s.Disease ~", "`",paste0(c(
+#     "dopamine.receptor.agonist",
+#     "tpsa",
+#     "num.atoms"
+#   ), collapse = "`+`"), "`"))
+# )
+# 
+# test.predictions = predict(
+#   object = parkinsons.sub,
+#   newdata = parkinsons.test
+# )
+# 
+# roc.curve = roc(parkinsons.test$depression, test.predictions)
+# plot(roc.curve, col = "maroon", main = "ROC Curve", 
+#      print.auc = TRUE)
+# 
+# # Training Confusion Matrix
+# confusionMatrix(as.factor(as.numeric(parkinsons.sub$fitted.values > parkinsons.cutoff)), parkinsons.train$Parkinson.s.Disease, positive = "1")
+# # Testing Confusion Matrix
+# confusionMatrix(as.factor(as.numeric(test.predictions > parkinsons.cutoff)), parkinsons.test$Parkinson.s.Disease, positive = "1")
+# 
+# summary(parkinsons.sub)
 
 # Schizophrenia
+
+schizophrenia.cutoff = 0.6
 
 schizophrenia.full = glm(
   data = schizophrenia.train,
@@ -312,20 +304,41 @@ test.predictions = predict(
 )
 
 roc.curve = roc(schizophrenia.test$depression, test.predictions)
+plot(roc.curve, col = "maroon", main = "ROC Curve",
+     print.auc = TRUE)
+
+# Training Confusion Matrix
+confusionMatrix(as.factor(as.numeric(schizophrenia.full$fitted.values > schizophrenia.cutoff)), schizophrenia.train$schizophrenia, positive = "1")
+# Testing Confusion Matrix
+confusionMatrix(as.factor(as.numeric(test.predictions > schizophrenia.cutoff)), schizophrenia.test$schizophrenia, positive = "1")
+
+summary(schizophrenia.full)
+
+schizophrenia.sub = glm(
+  data = schizophrenia.train,
+  family = "binomial",
+  formula = as.formula(paste0("schizophrenia ~", "`",paste0(c(
+    "HTR",
+    "dopamine.receptor.antagonist",
+    "serotonin.receptor.antagonist",
+    "num.atoms",
+    "mass"
+  ), collapse = "`+`"), "`"))
+)
+
+test.predictions = predict(
+  object = schizophrenia.sub,
+  newdata = schizophrenia.test
+)
+
+roc.curve = roc(schizophrenia.test$depression, test.predictions)
 plot(roc.curve, col = "maroon", main = "ROC Curve", 
      print.auc = TRUE)
 
-# schizophrenia.sub = glm(
-#   data = schizophrenia.train,
-#   family = "binomial",
-#   formula = as.formula(paste0("schizophrenia ~", "`",paste0(c(
-#     "SLC.count",
-#     "tpsa",
-#     "fp_19",
-#     "fp_82",
-#     "fp_104"
-#   ), collapse = "`+`"), "`"))
-# )
+# Training Confusion Matrix
+confusionMatrix(as.factor(as.numeric(schizophrenia.sub$fitted.values > schizophrenia.cutoff)), schizophrenia.train$schizophrenia, positive = "1")
+# Testing Confusion Matrix
+confusionMatrix(as.factor(as.numeric(test.predictions > schizophrenia.cutoff)), schizophrenia.test$schizophrenia, positive = "1")
 
-summary(schizophrenia.full)
+summary(schizophrenia.sub)
 
