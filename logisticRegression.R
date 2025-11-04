@@ -178,7 +178,7 @@ predictors.schizophrenia = c(
 
 # Depression
 
-depression.cutoff = 0.9 # Empirically, I found that this was the best for testing,
+depression.cutoff = 0.7 # Empirically, I found that this was the best for testing,
 # though from 0.5 and beyond the model did well
 
 depression.full = glm(
@@ -202,7 +202,7 @@ summary(depression.full)
 
 # Subset predictors for which p-value < .1 in fuller model to get an example
 # of a subset of predictors
-
+# 
 # depression.sub = glm(
 #   data = depression.train,
 #   family = "binomial",
@@ -232,7 +232,7 @@ summary(depression.full)
 # summary(depression.sub)
 # 
 # roc.curve = roc(depression.test$depression, test.predictions)
-# plot(roc.curve, col = "maroon", main = "ROC Curve", 
+# plot(roc.curve, col = "maroon", main = "ROC Curve",
 #      print.auc = TRUE)
 
 
@@ -246,7 +246,7 @@ parkinsons.full = glm(
   formula = as.formula(paste0("Parkinson.s.Disease ~", "`",paste0(predictors.parkinsons, collapse = "`+`"), "`"))
 )
 
-test.predictionstest.predictionstest.predictions = predict(
+test.predictions = predict(
   object = parkinsons.full,
   newdata = parkinsons.test
 )
