@@ -7,6 +7,22 @@ library(caret)
 # Run dataPrep_1sAnd0s.R for all.drugs 
 names(all.drugs) = make.names(names(all.drugs))
 
+all.drugs$dopamine.receptor.antagonist[which(all.drugs$dopamine.receptor.antagonist == 2)] = 1
+
+all.drugs$dopamine.receptor.antagonist = droplevels(all.drugs$dopamine.receptor.antagonist)
+
+all.drugs$dopamine.receptor.agonist[which(all.drugs$dopamine.receptor.agonist == 2)] = 1
+
+all.drugs$dopamine.receptor.agonist = droplevels(all.drugs$dopamine.receptor.agonist)
+
+all.drugs$serotonin.receptor.antagonist[which(all.drugs$serotonin.receptor.antagonist == 2)] = 1
+
+all.drugs$serotonin.receptor.antagonist = droplevels(all.drugs$serotonin.receptor.antagonist)
+
+all.drugs$serotonin.receptor.agonist[which(all.drugs$serotonin.receptor.agonist == 2)] = 1
+
+all.drugs$serotonin.receptor.agonist = droplevels(all.drugs$serotonin.receptor.agonist)
+
 neuro.psych = all.drugs %>%
   filter(str_detect(`Disease.Area`, "neurology/psychiatry"),
          Phase == "Launched")
@@ -238,7 +254,7 @@ summary(depression.full)
 
 # Parkinson's Disease
 
-parkinsons.cutoff = 0.5
+parkinsons.cutoff = 0.7
 
 parkinsons.full = glm(
   data = parkinsons.train,
@@ -262,31 +278,32 @@ confusionMatrix(as.factor(as.numeric(test.predictions > parkinsons.cutoff)), par
 
 summary(parkinsons.full)
 
-# parkinsons.sub = glm(
-#   data = parkinsons.train,
-#   family = "binomial",
-#   formula = as.formula(paste0("Parkinson.s.Disease ~", "`",paste0(c(
-#     "dopamine.receptor.agonist",
-#     "tpsa",
-#     "num.atoms"
-#   ), collapse = "`+`"), "`"))
-# )
-# 
-# test.predictions = predict(
-#   object = parkinsons.sub,
-#   newdata = parkinsons.test
-# )
-# 
-# roc.curve = roc(parkinsons.test$depression, test.predictions)
-# plot(roc.curve, col = "maroon", main = "ROC Curve", 
-#      print.auc = TRUE)
-# 
-# # Training Confusion Matrix
-# confusionMatrix(as.factor(as.numeric(parkinsons.sub$fitted.values > parkinsons.cutoff)), parkinsons.train$Parkinson.s.Disease, positive = "1")
-# # Testing Confusion Matrix
-# confusionMatrix(as.factor(as.numeric(test.predictions > parkinsons.cutoff)), parkinsons.test$Parkinson.s.Disease, positive = "1")
-# 
-# summary(parkinsons.sub)
+parkinsons.sub = glm(
+  data = parkinsons.train,
+  family = "binomial",
+  formula = as.formula(paste0("Parkinson.s.Disease ~", "`",paste0(c(
+    "dopamine.receptor.agonist",
+    "xlogp",
+    "tpsa",
+    "num.atoms"
+  ), collapse = "`+`"), "`"))
+)
+
+test.predictions = predict(
+  object = parkinsons.sub,
+  newdata = parkinsons.test
+)
+
+roc.curve = roc(parkinsons.test$depression, test.predictions)
+plot(roc.curve, col = "maroon", main = "ROC Curve",
+     print.auc = TRUE)
+
+# Training Confusion Matrix
+confusionMatrix(as.factor(as.numeric(parkinsons.sub$fitted.values > parkinsons.cutoff)), parkinsons.train$Parkinson.s.Disease, positive = "1")
+# Testing Confusion Matrix
+confusionMatrix(as.factor(as.numeric(test.predictions > parkinsons.cutoff)), parkinsons.test$Parkinson.s.Disease, positive = "1")
+
+summary(parkinsons.sub)
 
 # Schizophrenia
 
