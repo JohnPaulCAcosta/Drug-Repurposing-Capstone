@@ -219,31 +219,31 @@ summary(depression.full)
 # Subset predictors for which p-value < .1 in fuller model to get an example
 # of a subset of predictors
 # 
-# depression.sub = glm(
-#   data = depression.train,
-#   family = "binomial",
-#   formula = as.formula(paste0("depression ~", "`",paste0(c(
-#     "SLC.count",
-#     "tpsa",
-#     "fp_19",
-#     "fp_82",
-#     "fp_104"
-#   ), collapse = "`+`"), "`"))
-# )
-# 
-# test.predictions = predict(
-#   object = depression.sub,
-#   newdata = depression.test,
-#   type = "response"
-# )
+depression.sub = glm(
+  data = depression.train,
+  family = "binomial",
+  formula = as.formula(paste0("depression ~", "`",paste0(c(
+    "SLC.count",
+    "tpsa",
+    "fp_19",
+    "fp_82",
+    "fp_104"
+  ), collapse = "`+`"), "`"))
+)
+
+test.predictions = predict(
+  object = depression.sub,
+  newdata = depression.test,
+  type = "response"
+)
 # 
 # roc.curve = roc(depression.test$depression, test.predictions)
 # plot(roc.curve, col = "maroon", main = "ROC Curve", print.auc = TRUE)
 # 
 # # Training Confusion Matrix
-# confusionMatrix(as.factor(as.numeric(depression.sub$fitted.values > depression.cutoff)), depression.train$depression, positive = "1")
+confusionMatrix(as.factor(as.numeric(depression.sub$fitted.values > depression.cutoff)), depression.train$depression, positive = "1")
 # # Testing Confusion Matrix
-# confusionMatrix(as.factor(as.numeric(test.predictions > depression.cutoff)), depression.test$depression, positive = "1")
+confusionMatrix(as.factor(as.numeric(test.predictions > depression.cutoff)), depression.test$depression, positive = "1")
 # 
 # summary(depression.sub)
 # 
@@ -282,10 +282,10 @@ parkinsons.sub = glm(
   data = parkinsons.train,
   family = "binomial",
   formula = as.formula(paste0("Parkinson.s.Disease ~", "`",paste0(c(
-    "dopamine.receptor.agonist",
     "xlogp",
-    "tpsa",
-    "num.atoms"
+    # "tpsa",
+    # "num.atoms",
+    "dopamine.receptor.agonist"
   ), collapse = "`+`"), "`"))
 )
 
@@ -337,9 +337,11 @@ schizophrenia.sub = glm(
   formula = as.formula(paste0("schizophrenia ~", "`",paste0(c(
     "HTR",
     "dopamine.receptor.antagonist",
-    "serotonin.receptor.antagonist",
-    "num.atoms",
-    "mass"
+    # "num.atoms"#,
+    # "xlogp"
+    # "mass"
+    # "fp_151",
+    "serotonin.receptor.antagonist"#,
   ), collapse = "`+`"), "`"))
 )
 
@@ -358,4 +360,14 @@ confusionMatrix(as.factor(as.numeric(schizophrenia.sub$fitted.values > schizophr
 confusionMatrix(as.factor(as.numeric(test.predictions > schizophrenia.cutoff)), schizophrenia.test$schizophrenia, positive = "1")
 
 summary(schizophrenia.sub)
+
+
+
+#### Assumptions Checking ####
+
+vif(depression.full)
+
+vif(parkinsons.full)
+
+vif(schizophrenia.sub)
 

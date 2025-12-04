@@ -307,8 +307,267 @@ fingerprints = map(all.drugs$parsed.SMILES, ~ get.fingerprint(.x, type = "maccs"
 all.drugs = cbind(all.drugs, fp_to_df(fingerprints))
 
 
+#### MOA by Indication ####
+
+all.drugs %>%
+  separate_rows(MOA, sep = ",\\s*") %>%
+  separate_rows(Indication, sep = ",\\s*") %>%
+  separate_rows(`Disease.Area`, sep = ",\\s*") %>%
+  filter(`Disease.Area` == "neurology/psychiatry",
+         Indication == c("depression", "schizophrenia",
+                         "Parkinson's Disease")) %>%
+  group_by(MOA) %>%
+  filter(n() > 1) %>%
+  ggplot(aes(y = MOA)) +
+  geom_bar(stat = "count", fill = "maroon") +
+  facet_wrap(vars(Indication), scales = "free_x") +
+  ylab("Mechanism of Action (MOA)") +
+  xlab("# of Occurences") +
+  theme_bw() +
+  theme(strip.background = element_rect(fill = "white", # get rid of ggplot grey face headers
+                                        color = "white"),
+        strip.text = element_text(size = 14)) +
+  guides(fill = "none") +
+  scale_x_continuous(
+    breaks = function(x) {
+      rng <- floor(min(x)):ceiling(max(x))
+      even <- rng[rng %% 2 == 0]
+      even
+    }
+  )
+
+
+#### Target Proteins by Indication
+
+all.drugs %>%
+  separate_rows(Indication, sep = ",\\s*") %>%
+  separate_rows(Target, sep = ",\\s*") %>%
+  mutate(TargetPrefix = sub("^([A-Za-z]+).*", "\\1", Target)) %>%
+  group_by(TargetPrefix, Indication) %>%
+  # filter(n() >= 5) %>%
+  ungroup() %>%
+  # filter(Indication %in% c("depression", "Parkinson's Disease", "schizophrenia", "pain relief", "seizures")) %>%
+  filter(Indication %in% c("depression", "Parkinson's Disease",
+                           "schizophrenia", "pain relief", "seizures"),
+         TargetPrefix %in% c(
+           "SLC",
+           "SCN",
+           "PTGS",
+           "HTR",
+           "HRH",
+           # "GRIN",
+           "GABRA",
+           "DRD",
+           "CHRM",
+           "CACNG",
+           "CACNA",
+           "ADRB",
+           "ADRA"
+         )) %>%
+  mutate(
+    Indication = factor(
+      Indication,
+      levels = c(
+        "depression",
+        "Parkinson's Disease",
+        "schizophrenia",
+        "seizures",
+        "pain relief"
+      )
+    )
+  ) %>%
+  ggplot(aes(y = TargetPrefix)) +
+  geom_bar(stat = "count", fill = "navy") +
+  facet_wrap(vars(Indication), scales = "free_x", nrow = 1) +
+  theme_bw() +
+  theme(
+    strip.background = element_rect(fill = "white", # get rid of ggplot grey face headers
+                                    color = "white"),
+    strip.text = element_text(size = 14),
+    # panel.grid.major.x = element_line(color = "white"),
+    # panel.grid.minor = element_line(color = "white")
+  ) +
+  labs(
+    x = "Count",
+    y = "Target Protein Prefix"
+  )
+
+all.drugs %>%
+  separate_rows(Indication, sep = ",\\s*") %>%
+  separate_rows(Target, sep = ",\\s*") %>%
+  filter(Indication %in% c("depression", "Parkinson's Disease",
+                           "schizophrenia", "pain relief", "seizures")) %>%
+  group_by(Target, Indication) %>%
+  # filter(n() >= 2) %>%
+  ungroup() %>%
+  mutate(
+    Indication = factor(
+      Indication,
+      levels = c(
+        "depression",
+        "Parkinson's Disease",
+        "schizophrenia",
+        "seizures",
+        "pain relief"
+      )
+    )
+  ) %>%
+  ggplot(aes(y = Target)) +
+  geom_bar(stat = "count", fill = "navy") +
+  facet_wrap(vars(Indication), scales = "free_x", nrow = 1) +
+  theme_bw() +
+  theme(
+    strip.background = element_rect(fill = "white", # get rid of ggplot grey face headers
+                                    color = "white"),
+    strip.text = element_text(size = 14),
+    axis.text.y = element_text(size = 8, face = "italic")
+    # panel.grid.major.x = element_line(color = "white"),
+    # panel.grid.minor = element_line(color = "white")
+  ) +
+  labs(
+    x = "Count",
+    y = "Target Protein Prefix"
+  )
+
+# all.drugs %>%
+#   separate_rows(Indication, sep = ",\\s*") %>%
+#   separate_rows(Target, sep = ",\\s*") %>%
+#   mutate(TargetPrefix = sub("^([A-Za-z]+).*", "\\1", Target)) %>%
+#   group_by(TargetPrefix, Indication) %>%
+#   filter(n() > 5) %>%
+#   ungroup() %>%
+#   filter(Indication %in% c("depression", "Parkinson's Disease", "schizophrenia")) %>%
+#   ggplot(aes(y = TargetPrefix)) +
+#   geom_bar(
+#     aes(x = after_stat(count / sum(count))),
+#     stat = "count"
+#   ) +
+#   facet_wrap(vars(Indication), scales = "free_x") +
+#   labs(x = "Percentage", y = "Target Prefix")
+
+
+
 
 # all.drugs %>%
 #   select(-first.SMILES, -parsed.SMILES) %>%
 #   write.csv(file = "allDrugs1s0s.csv")
+
+
+
+#### Number of unique target proteins ####
+
+unique(all.drugs %>%
+         separate_rows(Target, sep = ",\\s*") %>%
+         pull(Target))
+
+# 2019 unique target proteins
+length(unique(all.drugs %>%
+                separate_rows(Target, sep = ",\\s*") %>%
+                pull(Target)))
+
+# 1004 unique protein groups based on character prefix
+length(unique(all.drugs %>%
+                separate_rows(Target, sep = ",\\s*") %>%
+                mutate(TargetPrefix = sub("^([A-Za-z]+).*", "\\1", Target)) %>%
+                pull(TargetPrefix))
+       )
+
+# 142 unique target proteins for our indications
+length(unique(all.drugs %>%
+                separate_rows(Indication, sep = ",\\s*") %>%
+                filter(Indication %in% c("depression", "Parkinson's Disease", "schizophrenia")) %>%
+                separate_rows(Target, sep = ",\\s*") %>%
+                pull(Target)))
+
+# 69 unique protein groups based on character prefix for our indication
+length(unique(all.drugs %>%
+                separate_rows(Indication, sep = ",\\s*") %>%
+                filter(Indication %in% c("depression", "Parkinson's Disease", "schizophrenia")) %>%
+                separate_rows(Target, sep = ",\\s*") %>%
+                mutate(TargetPrefix = sub("^([A-Za-z]+).*", "\\1", Target)) %>%
+                pull(TargetPrefix))
+)
+
+# 18 unique SLC proteins
+
+unique(all.drugs %>%
+  separate_rows(Disease.Area, sep = ",\\s*") %>%
+  filter(str_detect(Disease.Area, "neurology/psychiatry")) %>%
+  separate_rows(Target, sep = ",\\s*") %>%
+  filter(str_detect(Target, "SLC")) %>%
+  pull(Target))
+
+length(
+  unique(all.drugs %>%
+           separate_rows(Disease.Area, sep = ",\\s*") %>%
+           filter(str_detect(Disease.Area, "neurology/psychiatry")) %>%
+           separate_rows(Target, sep = ",\\s*") %>%
+           filter(str_detect(Target, "SLC")) %>%
+           pull(Target))
+)
+
+# 14 unique HTR proteins
+
+unique(all.drugs %>%
+         separate_rows(Disease.Area, sep = ",\\s*") %>%
+         filter(str_detect(Disease.Area, "neurology/psychiatry")) %>%
+         separate_rows(Target, sep = ",\\s*") %>%
+         filter(str_detect(Target, "HTR")) %>%
+         pull(Target))
+
+length(
+  unique(all.drugs %>%
+           separate_rows(Disease.Area, sep = ",\\s*") %>%
+           filter(str_detect(Disease.Area, "neurology/psychiatry")) %>%
+           separate_rows(Target, sep = ",\\s*") %>%
+           filter(str_detect(Target, "HTR")) %>%
+           pull(Target))
+)
+
+# all.drugs %>%
+#   separate_rows(Indication, sep = ",\\s*") %>%
+#   separate_rows(Target, sep = ",\\s*") %>%
+#   mutate(TargetPrefix = sub("^([A-Za-z]+).*", "\\1", Target)) %>%
+#   group_by(TargetPrefix, Indication) %>%
+#   filter(Indication %in% c("depression", "Parkinson's Disease", "schizophrenia", "pain relief", "seizures")) %>%
+  
+
+# 636 unique indications
+length(unique(all.drugs %>%
+                separate_rows(Indication, sep = ",\\s*") %>%
+                pull(Indication)))
+
+all.drugs %>%
+  filter(str_detect(`Disease.Area`, "neurology/psychiatry"),
+         Phase == "Launched") %>%
+  separate_rows(Indication, sep = ",\\s*") %>%
+  group_by(Indication) %>%
+  summarise(n = n()) %>%
+  arrange(desc(n))
+
+
+
+# Does target protein count look related to # of indications treated?
+
+all.drugs %>%
+  filter(Indication != "<NA>") %>%
+  separate_rows(Indication, sep = ",\\s*") %>%
+  separate_rows(Target, sep = ",\\s*") %>%
+  group_by(Name) %>%
+  summarize(
+    num_indications = n_distinct(Indication),
+    num_targets = n_distinct(Target)
+  ) %>%
+  ggplot(aes(x = num_targets, y = num_indications)) +
+  geom_point() +
+  geom_bin_2d(binwidth = c(1,1)) +
+  geom_smooth(method = "lm") +
+  labs(
+    title = "Relationship Between Number of Targets and Indications",
+    x = "# of Targets",
+    y = "# of Indications"
+  ) +
+  theme_minimal()
+
+
 

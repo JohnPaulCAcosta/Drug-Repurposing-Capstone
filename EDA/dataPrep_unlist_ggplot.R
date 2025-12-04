@@ -49,7 +49,7 @@ unlisted.drugs = all.drugs %>%
 unlisted.drugs %>%
   filter(`Disease Area` == "neurology/psychiatry",
          Indication == c("depression", "schizophrenia",
-                         "Parkinson's Disease", "pain relief")) %>%
+                         "Parkinson's Disease")) %>%
   ggplot(aes(y = Target)) +
   geom_bar(stat = "count") +
   facet_wrap(vars(Indication)) +
@@ -60,8 +60,9 @@ unlisted.drugs %>%
 # Generic first-letters-only clustering
 unlisted.drugs %>%
   filter(`Disease Area` == "neurology/psychiatry",
+         # Indication == c("depression")) %>%
          Indication == c("depression", "schizophrenia",
-                         "Parkinson's Disease", "pain relief")) %>%
+                         "Parkinson's Disease")) %>%
   group_by(TargetPrefix) %>%
   filter(n() >= 4) %>%
   ungroup() %>%
@@ -73,8 +74,8 @@ unlisted.drugs %>%
   theme_bw() +
   theme(strip.background = element_rect(fill = "white", # get rid of ggplot grey face headers
                                         color = "white"),
-        strip.text = element_text(size = 14)) +
-  guides(fill = "none")
+        strip.text = element_text(size = 14)) #+
+  # guides(fill = "none")
 
 # Our defined version of clustering - didn't work
 
@@ -106,7 +107,9 @@ all.drugs %>%
   separate_rows(`Disease Area`, sep = ",\\s*") %>%
   filter(`Disease Area` == "neurology/psychiatry",
          Indication == c("depression", "schizophrenia",
-                         "Parkinson's Disease", "pain relief")) %>%
+                         "Parkinson's Disease")) %>%
+  group_by(MOA) %>%
+  filter(n() > 1) %>%
   ggplot(aes(y = MOA)) +
   geom_bar(stat = "count", fill = "maroon") +
   facet_wrap(vars(Indication), scales = "free_x") +

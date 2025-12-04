@@ -93,8 +93,10 @@ neuro.psych %>%
 
 neuro.psych %>%
   separate_rows(Indication, sep = ",\\s*") %>%
+  filter(Indication == c("depression", "schizophrenia", "Parkinson's Disease",
+                         "pain relief", "seizures")) %>%
   group_by(Indication) %>%
-  filter(n() >= 10) %>%
+  # filter(n() >= 10) %>%
   ungroup() %>%
   select(Indication, Mass = mass, `# of Atoms` = num.atoms, 
          XLogP = xlogp, TPSA = tpsa) %>%
@@ -106,10 +108,17 @@ neuro.psych %>%
   facet_wrap(~ feature, 
              scales = "free_x") +
   theme_bw() +
-  xlab("") +
+  xlab("Value") +
   ylab("Indication") +
   theme(strip.background = element_rect(fill = "white", # get rid of ggplot grey face headers
                                         color = "white"))
+
+neuro.psych %>%
+  separate_rows(Indication, sep = ",\\s*") %>%
+  group_by(Indication) %>%
+  filter(n() > 10) %>%
+  summarise(n = n()) %>%
+  dplyr::arrange(n)
 
 # Both summary tables
 
